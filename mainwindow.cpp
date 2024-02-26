@@ -17,6 +17,11 @@ MainWindow::MainWindow(QWidget *parent)
     // 禁用 车辆声明广播按钮
     ui->pushButton->setEnabled(false);
 
+    // DOIP报文测试
+    doipPacket doipPkg;
+    doipPkg.RoutingActivationRequst(0x0e01, 1);
+    qDebug() << "DOIP RoutingActivationRequst Packet:" << doipPkg.Data().toHex(' ');
+
     iface_refresh();
 }
 
@@ -33,20 +38,20 @@ void MainWindow::iface_refresh()
     // 遍历所有网络接口
     foreach (QNetworkInterface interface, interfaces) {
         // 打印接口名称和硬件地址
-        qDebug() << "Interface Name:" << interface.name();
-        qDebug() << "Hardware Address:" << interface.hardwareAddress();
+        //qDebug() << "Interface Name:" << interface.name();
+        //qDebug() << "Hardware Address:" << interface.hardwareAddress();
 
         // 打印IPv4地址
         QList<QNetworkAddressEntry> entries = interface.addressEntries();
         foreach (QNetworkAddressEntry entry, entries) {
             if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
-                qDebug() << "IPv4 Address:" << entry.ip().toString();
-                qDebug() << "Netmask:" << entry.netmask().toString();
+                //qDebug() << "IPv4 Address:" << entry.ip().toString();
+                //qDebug() << "Netmask:" << entry.netmask().toString();
                 ui->comboBox_iface->addItem(entry.ip().toString());
             }
         }
 
-        qDebug() << "-----------------------------------";
+        //qDebug() << "-----------------------------------";
     }
 }
 
@@ -93,8 +98,10 @@ void MainWindow::TcpDataReadPendingDatagrams()
     {
         if(doipMsg.getSourceAddrFromRoutingActivationRequst(arr, testerAddr))
         {
+
             doipMsg.RoutingActivationResponse(testerAddr, ui->lineEdit_logicAddr->text().toShort(NULL, 16), 0x10);
             TcpData_Client->write(doipMsg.Data());
+
             qDebug() << "testrAddr:" << QString::number(testerAddr, 16) << "RoutingActivationResponse:" << doipMsg.Data().toHex(' ');
             ui->textBrowser->append("testrAddr:0x" + QString::number(testerAddr, 16) + " RoutingActivationResponse:" + doipMsg.Data().toHex(' '));
             ui->label_state->setText("RoutingActivationResponse suncc");
@@ -123,11 +130,11 @@ void MainWindow::TcpDataNewConnect()
     connect(TcpData_Client, &QTcpSocket::disconnected, this, &MainWindow::TcpDataDisconnect);
     connect(TcpData_Client, &QTcpSocket::readyRead, this, &MainWindow::TcpDataReadPendingDatagrams);
 
-    qDebug()<<"IP:" <<TcpData_Client_addr.toString() << " Port:" << TcpData_Client_port <<"连接上来!";
+    qDebug()<<"IP:" <<TcpData_Client_addr.toString() << " Port:" << QString::number(TcpData_Client_port) <<"连接上来!";
 
-    ui->textBrowser->append("IP:"+TcpData_Client_addr.toString() + " Port:" + TcpData_Client_port + "connected!");
+    ui->textBrowser->append("IP:"+TcpData_Client_addr.toString() + " Port:" + QString::number(TcpData_Client_port) + "connected!");
 
-    ui->label_state->setText(QString("new client IP:"+TcpData_Client_addr.toString() + " Port:" + TcpData_Client_port));
+    ui->label_state->setText(QString("new client IP:"+TcpData_Client_addr.toString() + " Port:" + QString::number(TcpData_Client_port)));
 }
 
 
