@@ -2,24 +2,16 @@
 
 本文用于记录在开发DOIP服务端过程收集的DOIP相关信息。
 
-
-
 ### DOIP简介
 
 DoIP: Diagnostic communication over Internet Protocol
 即基于因特网协议的诊断通信协议，对应的ISO标准号为13400.
-
-
 
 ### DoIP报文详情
 
 ![DoIPMsg](assets/d07ab717b690d353cbdfb0bd9c94d633e4d5a017.png)
 
 PS:从报文结构看，DoIP协议是建立在TCP/UDP协议之上，其内部可承载UDS诊断报文。
-
-
-
-
 
 ### DoIP节点的行为
 
@@ -28,8 +20,6 @@ PS:从报文结构看，DoIP协议是建立在TCP/UDP协议之上，其内部可
 UDP_DISCOVER： 13400
 
 TCP_DATA: 13400
-
-
 
 DoIP服务端
 
@@ -49,20 +39,7 @@ DoIP服务端
 
 DoIP客户端
 
-
-
 参考文献
 
 - [DoIP概述_AP AUTOSAR-CSDN专栏](https://download.csdn.net/blog/column/10225195/132345937)
-
-
-
-
-
-
-
-
-
-
-
-
+- http://t.csdnimg.cn/ivPQp

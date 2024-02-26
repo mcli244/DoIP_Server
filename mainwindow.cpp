@@ -22,6 +22,16 @@ MainWindow::MainWindow(QWidget *parent)
     doipPkg.RoutingActivationRequst(0x0e01, 1);
     qDebug() << "DOIP RoutingActivationRequst Packet:" << doipPkg.Data().toHex(' ');
 
+    doipPkg.DiagnosticMsgACK(0x0e01, 0x0DFF, 0x00);
+    qDebug() << "DOIP DiagnosticMsgACK Packet:" << doipPkg.Data().toHex(' ');
+
+    doipPkg.DiagnosticMsgNACK(0x0e01, 0x0DFF, 0x02);
+    qDebug() << "DOIP DiagnosticMsgNACK Packet:" << doipPkg.Data().toHex(' ');
+
+    QByteArray udsData = QByteArray::fromHex("1001");
+    doipPkg.DiagnosticMsg(0x0e01, 0x0DFF, udsData);
+    qDebug() << "DOIP DiagnosticMsg Packet:" << doipPkg.Data().toHex(' ');
+
     iface_refresh();
 }
 

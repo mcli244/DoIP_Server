@@ -3,19 +3,32 @@
 #include <QString>
 #include <QDebug>
 
-doipPacket::doipPacket(quint16 payloadType, QByteArray &payload)
+bool doipPacket::creatHeader(quint16 payloadType, quint32 payloadSize)
 {
-    _packet = new QByteArray();
+    if(_packet)
+        _packet->clear();
+    else
+        _packet = new QByteArray();
+
+    // DoIP Header
+    // Version ~Versison payloadType payloadSize
+    // 1B      1B        2B          4B
     _packet->append(0x02);
     _packet->append(0xFD);
     _packet->append(payloadType >> 8 & 0xff);
     _packet->append(payloadType >> 0 & 0xff);
 
-    _packet->append(payload.size() >> 24 & 0xff);
-    _packet->append(payload.size() >> 16 & 0xff);
-    _packet->append(payload.size() >> 8 & 0xff);
-    _packet->append(payload.size() >> 0 & 0xff);
+    _packet->append(payloadSize >> 24 & 0xff);
+    _packet->append(payloadSize >> 16 & 0xff);
+    _packet->append(payloadSize >> 8 & 0xff);
+    _packet->append(payloadSize >> 0 & 0xff);
 
+    return true;
+}
+
+doipPacket::doipPacket(quint16 payloadType, QByteArray &payload)
+{
+    creatHeader(payloadType, payload.size());
     _packet->append(payload);
 }
 
@@ -33,21 +46,10 @@ QByteArray& doipPacket::VehicleAnnouncement(QString VIN, quint16 logicalAddr,
                                             QByteArray EID, QByteArray GID,
                                             quint8 Fur, quint8 syncSta)
 {
-    _packet->clear();
-
     quint16 payloadType = 0x0004;
     quint32 payloadSize = 33;
 
-    // DoIP Header
-    _packet->append(0x02);
-    _packet->append(0xFD);
-    _packet->append(payloadType >> 8 & 0xff);
-    _packet->append(payloadType >> 0 & 0xff);
-
-    _packet->append(payloadSize >> 24 & 0xff);
-    _packet->append(payloadSize >> 16 & 0xff);
-    _packet->append(payloadSize >> 8 & 0xff);
-    _packet->append(payloadSize >> 0 & 0xff);
+    creatHeader(payloadType, payloadSize);
 
     // VehicleAnnouncement
     // VIN logicalAddr EID GID Fur syncSta
@@ -65,21 +67,10 @@ QByteArray& doipPacket::VehicleAnnouncement(QString VIN, quint16 logicalAddr,
 
 QByteArray& doipPacket::RoutingActivationRequst(quint16 sourceAddr, quint8 activationType)
 {
-    _packet->clear();
-
     quint16 payloadType = 0x0005;
     quint32 payloadSize = 11;
 
-    // DoIP Header
-    _packet->append(0x02);
-    _packet->append(0xFD);
-    _packet->append(payloadType >> 8 & 0xff);
-    _packet->append(payloadType >> 0 & 0xff);
-
-    _packet->append(payloadSize >> 24 & 0xff);
-    _packet->append(payloadSize >> 16 & 0xff);
-    _packet->append(payloadSize >> 8 & 0xff);
-    _packet->append(payloadSize >> 0 & 0xff);
+    creatHeader(payloadType, payloadSize);
 
     // RoutingActivationRequst
     // sourceAddr activationType ISO OEM
@@ -95,23 +86,10 @@ QByteArray& doipPacket::RoutingActivationRequst(quint16 sourceAddr, quint8 activ
 
 QByteArray& doipPacket::RoutingActivationResponse(quint16 testerLogicalAddr, quint16 sourceAddr, quint8 respCode)
 {
-    _packet->clear();
-
     quint16 payloadType = 0x0006;
     quint32 payloadSize = 13;
 
-    // DoIP Header
-    // Version ~Versison payloadType payloadSize
-    // 1B      1B        2B          4B
-    _packet->append(0x02);
-    _packet->append(0xFD);
-    _packet->append(payloadType >> 8 & 0xff);
-    _packet->append(payloadType >> 0 & 0xff);
-
-    _packet->append(payloadSize >> 24 & 0xff);
-    _packet->append(payloadSize >> 16 & 0xff);
-    _packet->append(payloadSize >> 8 & 0xff);
-    _packet->append(payloadSize >> 0 & 0xff);
+    creatHeader(payloadType, payloadSize);
 
     // RoutingActivationResponse
     // testerLogicalAddr sourceAddr respCode ISO OEM
@@ -129,6 +107,7 @@ QByteArray& doipPacket::RoutingActivationResponse(quint16 testerLogicalAddr, qui
 
 bool doipPacket::isDoipPacket(QByteArray &arr)
 {
+    int size = arr.size();
     return false;
 }
 
@@ -196,4 +175,77 @@ doipPacket::~doipPacket()
 {
     delete _packet;
 }
+
+QByteArray &doipPacket::DiagnosticMsg(quint16 sourceAddr, quint16 targetAddr, QByteArray &udsData)
+{
+    creatHeader(0x8001, udsData.size() + 4);
+
+    _packet->append(sourceAddr >> 8 & 0xff);
+    _packet->append(sourceAddr >> 0 & 0xff);
+    _packet->append(targetAddr >> 8 & 0xff);
+    _packet->append(targetAddr >> 0 & 0xff);
+
+    _packet->append(udsData);
+
+    return *this->_packet;
+}
+
+QByteArray &doipPacket::DiagnosticMsgACKorNACK(quint16 sourceAddr, quint16 targetAddr, quint8 type, quint8 code, QByteArray &udsData)
+{
+    if(type == doipPacket::ACK)
+        creatHeader(0x8002, udsData.size() + 5);
+    else
+        creatHeader(0x8003, udsData.size() + 5);
+
+    _packet->append(sourceAddr >> 8 & 0xff);
+    _packet->append(sourceAddr >> 0 & 0xff);
+    _packet->append(targetAddr >> 8 & 0xff);
+    _packet->append(targetAddr >> 0 & 0xff);
+    _packet->append(code);
+
+    if(udsData.size() != 0)
+        _packet->append(udsData);
+
+    return *this->_packet;
+}
+
+QByteArray &doipPacket::DiagnosticMsgACK(quint16 sourceAddr, quint16 targetAddr, quint8 code)
+{
+    QByteArray tmp;
+    tmp.clear();
+    return DiagnosticMsgACKorNACK(sourceAddr, targetAddr, doipPacket::ACK, code, tmp);
+}
+
+QByteArray &doipPacket::DiagnosticMsgACK(quint16 sourceAddr, quint16 targetAddr, quint8 code, QByteArray &udsData)
+{
+    return DiagnosticMsgACKorNACK(sourceAddr, targetAddr, doipPacket::ACK, code, udsData);
+}
+
+/**
+ * @brief doipPacket::DiagnosticMsgNACK
+ * @param sourceAddr
+ * @param targetAddr
+ * @param code
+ *          0x00, 0x01 为ISO13400保留
+ *          0x02: 无效的源地址
+ *          0x03: 无效的目的地址
+ *          0x04: 诊断消息长度太大
+ *          0x05: 超出内存范围
+ *          0x06: 目的端口不可达
+ *          0x07: 未知网络
+ *          0x08: 传输层错误
+ * @return
+ */
+QByteArray &doipPacket::DiagnosticMsgNACK(quint16 sourceAddr, quint16 targetAddr, quint8 code)
+{
+    QByteArray tmp;
+    tmp.clear();
+    return DiagnosticMsgACKorNACK(sourceAddr, targetAddr, doipPacket::NACK, code, tmp);
+}
+
+QByteArray &doipPacket::DiagnosticMsgNACK(quint16 sourceAddr, quint16 targetAddr, quint8 code, QByteArray &udsData)
+{
+    return DiagnosticMsgACKorNACK(sourceAddr, targetAddr, doipPacket::NACK, code, udsData);
+}
+
 
