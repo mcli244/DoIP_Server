@@ -3,6 +3,7 @@
 #include <QNetworkInterface>
 #include <QDebug>
 #include <QtEndian>
+#include <QTimer>
 
 #include "doip.h"
 
@@ -12,6 +13,11 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     ui->label_state->setText("DoIP Server is stop");
+
+    // 禁用 车辆声明广播按钮
+    ui->pushButton->setEnabled(false);
+
+    iface_refresh();
 }
 
 MainWindow::~MainWindow()
@@ -19,21 +25,48 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::on_pushButton_clicked()
+void MainWindow::iface_refresh()
 {
-    qint64 ret = -1;
+    // 获取系统中的所有网络接口
+    QList<QNetworkInterface> interfaces = QNetworkInterface::allInterfaces();
 
+    // 遍历所有网络接口
+    foreach (QNetworkInterface interface, interfaces) {
+        // 打印接口名称和硬件地址
+        qDebug() << "Interface Name:" << interface.name();
+        qDebug() << "Hardware Address:" << interface.hardwareAddress();
+
+        // 打印IPv4地址
+        QList<QNetworkAddressEntry> entries = interface.addressEntries();
+        foreach (QNetworkAddressEntry entry, entries) {
+            if (entry.ip().protocol() == QAbstractSocket::IPv4Protocol) {
+                qDebug() << "IPv4 Address:" << entry.ip().toString();
+                qDebug() << "Netmask:" << entry.netmask().toString();
+                ui->comboBox_iface->addItem(entry.ip().toString());
+            }
+        }
+
+        qDebug() << "-----------------------------------";
+    }
+}
+
+bool MainWindow::sendVehicleAnnouncement(QHostAddress addr, quint16 port)
+{
     doipPacket doipPkg;
     doipPkg.VehicleAnnouncement(ui->lineEdit_VIN->text(), ui->lineEdit_logicAddr->text().toShort(NULL, 16),
                                 QByteArray::fromHex(ui->lineEdit_EID->text().toUtf8()),
                                 QByteArray::fromHex(ui->lineEdit_GID->text().toUtf8()), 0, 0);
     qDebug() << "DOIP Packet:" << doipPkg.Data().toHex(' ');
 
-    ret = Discover_Socket->writeDatagram(doipPkg.Data(), QHostAddress::Broadcast, UDP_DISCOVERY);
-    if(ret < 0)
-        qDebug() << "writeDatagram failed";
-    else
+    return Discover_Socket->writeDatagram(doipPkg.Data(), addr, port);
+}
+
+void MainWindow::on_pushButton_clicked()
+{
+    if(sendVehicleAnnouncement(QHostAddress::Broadcast, ui->lineEdit_UDP_DISCOVER->text().toInt(NULL)))
         qDebug() << "writeDatagram succ";
+    else
+        qDebug() << "writeDatagram failed";
 
     ui->textBrowser->append("VehicleAnnouncement send succ");
     ui->label_state->setText("VehicleAnnouncement send succ");
@@ -112,8 +145,8 @@ void MainWindow::readPendingDatagrams()
         //接收数据
         Discover_Socket->readDatagram(arr.data(),arr.size(),&addr,&port);
         //显示
-        qDebug() << "IP:" << addr.toString() << " Prot:" << port << "DOIP Packet:" << arr.toHex(' ');
-        ui->textBrowser->append("IP:"+addr.toString() + " Port:" + port + "recv:" + arr.toHex(' '));
+        qDebug() << "IP:" << addr.toString() << " Prot:" << QString::number(port) << "DOIP Packet:" << arr.toHex(' ');
+        ui->textBrowser->append("IP:"+addr.toString() + " Port:" + QString::number(port) + "recv:" + arr.toHex(' '));
     }
 
 }
@@ -128,23 +161,83 @@ void MainWindow::on_pushButton_start_clicked()
         TcpData_Server->close();
         runing = false;
 
+        // 启用ECU信息编辑
+        ui->lineEdit_logicAddr->setEnabled(true);
+        ui->lineEdit_VIN->setEnabled(true);
+        ui->lineEdit_EID->setEnabled(true);
+        ui->lineEdit_GID->setEnabled(true);
+
+        ui->lineEdit_TCP_DATA->setEnabled(true);
+        ui->lineEdit_UDP_DISCOVER->setEnabled(true);
+
+        ui->pushButton_refresh->setEnabled(true);
+
+        // 禁用 车辆声明广播按钮
+        ui->pushButton->setEnabled(false);
+
         ui->label_state->setText("DoIP Server is stop");
         ui->pushButton_start->setText("启动");
     }
     else
     {
         Discover_Socket = new QUdpSocket();
-        Discover_Socket->bind(QHostAddress("192.168.31.115"), UDP_DISCOVERY);   // 绑定网卡所在的IP
+
+        if(false == Discover_Socket->bind(QHostAddress(ui->comboBox_iface->currentText()), ui->lineEdit_UDP_DISCOVER->text().toInt(NULL)))   // 绑定网卡所在的IP
+        {
+            ui->label_state->setText("Discover IP地址绑定失败，检查IP地址是否可用！");
+            return;
+        }
 
         TcpData_Server = new QTcpServer();
-        TcpData_Server->listen(QHostAddress("192.168.31.115"), TCP_DATA);
+        if(false == TcpData_Server->listen(QHostAddress(ui->comboBox_iface->currentText()), ui->lineEdit_TCP_DATA->text().toInt(NULL)))
+        {
+            Discover_Socket->close();
+            ui->label_state->setText("TcpData IP地址绑定失败，检查IP地址是否可用！");
+            return;
+        }
 
         connect(Discover_Socket, &QUdpSocket::readyRead, this, &MainWindow::readPendingDatagrams);
         connect(TcpData_Server, &QTcpServer::newConnection, this, &MainWindow::TcpDataNewConnect);
         runing = true;
 
+        // 禁用ECU信息编辑
+        ui->lineEdit_logicAddr->setEnabled(false);
+        ui->lineEdit_VIN->setEnabled(false);
+        ui->lineEdit_EID->setEnabled(false);
+        ui->lineEdit_GID->setEnabled(false);
+
+        ui->lineEdit_TCP_DATA->setEnabled(false);
+        ui->lineEdit_UDP_DISCOVER->setEnabled(false);
+
+        ui->pushButton_refresh->setEnabled(false);
+
+        // 启用 车辆声明广播按钮
+        ui->pushButton->setEnabled(true);
+
+        ui->textBrowser->append("Discover       (UDP): " + ui->comboBox_iface->currentText() + " Port: " + ui->lineEdit_UDP_DISCOVER->text());
+        ui->textBrowser->append("TCP_Data_Server(TCP): " + ui->comboBox_iface->currentText() + " Port: " + ui->lineEdit_TCP_DATA->text());
         ui->label_state->setText("DoIP Server is running");
         ui->pushButton_start->setText("停止");
+
+        // 启动定时器，间隔150ms发送车辆声明 (DOIP协议约定，在500ms内，发送三次)
+        Discover_timer = new QTimer();
+        Discover_timer->setInterval(150);
+        Discover_timer->start();
+        connect(Discover_timer, &QTimer::timeout, [=](){
+            static int cnt = 0;
+
+            if(sendVehicleAnnouncement(QHostAddress::Broadcast, ui->lineEdit_UDP_DISCOVER->text().toInt(NULL)))
+                qDebug() << "writeDatagram succ";
+            else
+                qDebug() << "writeDatagram failed";
+
+            ui->textBrowser->append("AUTO VehicleAnnouncement send succ");
+            ui->label_state->setText("AUTO  VehicleAnnouncement send succ");
+
+            cnt++;
+            if(cnt >= 3)
+                Discover_timer->stop();
+        });
     }
 
 }
