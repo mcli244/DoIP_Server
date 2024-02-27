@@ -5,6 +5,9 @@
 #include <QUdpSocket>
 #include <QTcpSocket>
 #include <QTcpServer>
+#include <QStandardItemModel>
+
+#include "doip.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -32,6 +35,16 @@ private slots:
     void iface_refresh();
     bool sendVehicleAnnouncement(QHostAddress addr, quint16 port);
 
+    void on_pushButton_add_col_clicked();
+
+    void on_pushButton_add_row_clicked();
+
+    void on_pushButton_del_col_clicked();
+
+    void on_pushButton_del_row_clicked();
+
+    void on_pushButton_ECU_DID_Refresh_clicked();
+
 private:
     Ui::MainWindow *ui;
     QUdpSocket *Discover_Socket = NULL;
@@ -42,5 +55,10 @@ private:
     bool runing = false;
 
     QTimer *Discover_timer = NULL;
+    QStandardItemModel *ECU_DID_model;
+
+    bool DiagnosticMsgPro(QByteArray &uds, QByteArray &resp);
+    bool getValueByDID(quint32 did, QByteArray &value);
+    void DiagnosticMsgPro(struct doipPacket::DiagnosticMsg &dmsg, QByteArray &resp);
 };
 #endif // MAINWINDOW_H

@@ -4,8 +4,10 @@
 #include <QDebug>
 #include <QtEndian>
 #include <QTimer>
+#include <QStandardItemModel>
+#include <QThread>
 
-#include "doip.h"
+
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -17,8 +19,22 @@ MainWindow::MainWindow(QWidget *parent)
     // 禁用 车辆声明广播按钮
     ui->pushButton->setEnabled(false);
 
+    // ECU DID
+    // 创建一个标准的表格模型
+    ECU_DID_model = new QStandardItemModel(0,3);
+    ECU_DID_model->setHorizontalHeaderLabels(QStringList() << "DID" << "值" << "描述");
+
+    ECU_DID_model->setItem(0, 0, new QStandardItem("0xF190"));
+    ECU_DID_model->setItem(0, 1, new QStandardItem(ui->lineEdit_VIN->text()));
+    ECU_DID_model->setItem(0, 2, new QStandardItem("标识VIN码"));
+
+    ui->tableView_ECU_DID->setModel(ECU_DID_model);
+    ui->tableView_ECU_DID->resizeColumnsToContents();
+    ui->tableView_ECU_DID->show();
+
     // DOIP报文测试
     doipPacket doipPkg;
+
     doipPkg.RoutingActivationRequst(0x0e01, 1);
     qDebug() << "DOIP RoutingActivationRequst Packet:" << doipPkg.Data().toHex(' ');
 
@@ -31,6 +47,14 @@ MainWindow::MainWindow(QWidget *parent)
     QByteArray udsData = QByteArray::fromHex("1001");
     doipPkg.DiagnosticMsg(0x0e01, 0x0DFF, udsData);
     qDebug() << "DOIP DiagnosticMsg Packet:" << doipPkg.Data().toHex(' ');
+
+    struct doipPacket::DiagnosticMsg dmsg;
+    doipPkg.DiagnosticMsgAnalyze(dmsg);
+    qDebug() << "DOIP DiagnosticMsgAnalyze "
+             << "type:" << QString::number(dmsg.type)
+             << "sourceAddr:" << QString::number(dmsg.sourceAddr, 16)
+             << "targetAddr:" << QString::number(dmsg.targetAddr, 16)
+             << "uds:" << dmsg.udsData.toHex(' ');
 
     iface_refresh();
 }
@@ -94,6 +118,83 @@ void MainWindow::TcpDataDisconnect()
     TcpData_Client_port = 0;
 }
 
+bool MainWindow::getValueByDID(quint32 did, QByteArray &value)
+{
+    // 查询tabview里面的信息
+    quint32 did_tmp = 0;
+    for(int i=0; i<ECU_DID_model->rowCount(); i++)
+    {
+        did_tmp = ECU_DID_model->data(ECU_DID_model->index(i, 0)).toString().toInt(NULL, 16);
+//        qDebug() << "rowCount:" << QString::number(ECU_DID_model->rowCount())
+//                 << "did:0x" << QString::number(did, 16)
+//                 << "did_tmp:0x" << QString::number(did_tmp, 16)
+//                 << "值:" << ECU_DID_model->data(ECU_DID_model->index(i, 1)).toString()
+//                 << "描述:" << ECU_DID_model->data(ECU_DID_model->index(i, 2)).toString();
+        if(did_tmp == did)
+        {
+            value = ECU_DID_model->data(ECU_DID_model->index(i, 1)).toByteArray();
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
+{
+    if(!uds.size())
+        return false;
+
+    quint8 sid = uds.at(0);
+    quint32 did;
+    QByteArray value;
+
+    switch (sid) {
+    case 0x10:  break;
+    case 0x22:
+        // 获取DID
+        if(uds.size() > 3)
+        {
+            did = (uds.at(1) & 0xff) << 24;
+            did |= (uds.at(2) & 0xff) << 16;
+            did |= (uds.at(3) & 0xff) << 8;
+            did |= (uds.at(4) & 0xff) << 0;
+        }
+        else
+        {
+            did = (uds.at(1) & 0xff) << 8;
+            did |= (uds.at(2) & 0xff) << 0;
+        }
+
+        if(getValueByDID(did, value))
+        {
+            resp.append(0x62);
+            resp.append(uds.mid(1, uds.size() > 3 ? 4:2));
+            resp.append(value);
+        }
+        break;
+    default:
+        break;
+    }
+
+
+}
+
+void MainWindow::DiagnosticMsgPro(struct doipPacket::DiagnosticMsg &dmsg, QByteArray &resp)
+{
+    switch (dmsg.type) {
+    case doipPacket::ACK:
+        break;
+    case doipPacket::NACK:
+        break;
+    case doipPacket::MSG:
+
+        DiagnosticMsgPro(dmsg.udsData, resp);
+        break;
+    default:
+        break;
+    }
+}
 
 void MainWindow::TcpDataReadPendingDatagrams()
 {
@@ -101,20 +202,24 @@ void MainWindow::TcpDataReadPendingDatagrams()
     QByteArray arr = TcpData_Client->readAll();
     qDebug()<<"IP:" <<TcpData_Client_addr.toString() << " Port:" << TcpData_Client_port <<"recv:" << arr.toHex(' ');
 
-    doipPacket doipMsg;
+    doipPacket doipMsg(arr);
     quint16 testerAddr;
 
-    if(doipMsg.isRoutingActivationRequst(arr))
+    if(doipMsg.isRoutingActivationRequst())
     {
-        if(doipMsg.getSourceAddrFromRoutingActivationRequst(arr, testerAddr))
+        if(doipMsg.getSourceAddrFromRoutingActivationRequst(testerAddr))
         {
+            doipPacket doipRes;
+            if(doipRes.RoutingActivationResponse(testerAddr, ui->lineEdit_logicAddr->text().toShort(NULL, 16), 0x10))
+            {
+                TcpData_Client->write(doipRes.Data());
 
-            doipMsg.RoutingActivationResponse(testerAddr, ui->lineEdit_logicAddr->text().toShort(NULL, 16), 0x10);
-            TcpData_Client->write(doipMsg.Data());
-
-            qDebug() << "testrAddr:" << QString::number(testerAddr, 16) << "RoutingActivationResponse:" << doipMsg.Data().toHex(' ');
-            ui->textBrowser->append("testrAddr:0x" + QString::number(testerAddr, 16) + " RoutingActivationResponse:" + doipMsg.Data().toHex(' '));
-            ui->label_state->setText("RoutingActivationResponse suncc");
+                qDebug() << "testrAddr:" << QString::number(testerAddr, 16) << "RoutingActivationResponse:" << doipRes.Data().toHex(' ');
+                ui->textBrowser->append("testrAddr:0x" + QString::number(testerAddr, 16) + " RoutingActivationResponse:" + doipRes.Data().toHex(' '));
+                ui->label_state->setText("RoutingActivationResponse suncc");
+            }
+            else
+                qDebug() << "creat RoutingActivationResponse pkg filed";
         }
         else
         {
@@ -122,6 +227,46 @@ void MainWindow::TcpDataReadPendingDatagrams()
             ui->textBrowser->append("getSourceAddrFromRoutingActivationRequst failed");
             ui->label_state->setText("RoutingActivationResponse failed");
         }
+    } else if(doipMsg.isDiagnosticMsg())
+    {
+        struct doipPacket::DiagnosticMsg dmsg;
+        if(doipMsg.DiagnosticMsgAnalyze(dmsg))
+        {
+            QByteArray resp;
+            QString result = QString("DOIP DiagnosticMsgAnalyze type: " + QString::number(dmsg.type)
+                             + " sourceAddr: " + QString::number(dmsg.sourceAddr, 16)
+                             + " targetAddr: " + QString::number(dmsg.targetAddr, 16)
+                             + " uds:" + dmsg.udsData.toHex(' '));
+            qDebug() << result;
+            ui->textBrowser->append(result);
+
+            doipPacket doipResACK;
+
+            // 回应DOIP ACK
+            if(doipResACK.DiagnosticMsgACK(ui->lineEdit_logicAddr->text().toShort(NULL, 16), dmsg.sourceAddr, 0x00))
+            {
+                qDebug() << "DiagnosticMsgACK:" << doipResACK.Data().toHex(' ');
+                TcpData_Client->write(doipResACK.Data());
+                TcpData_Client->flush();    //将缓冲区的数据全部发送出去，不然这个的ACK和下面的MSG包会黏在一起发出去
+            }
+
+            // 回应 MSG
+            doipPacket doipRes;
+            DiagnosticMsgPro(dmsg, resp);
+            if(doipRes.DiagnosticMsg(ui->lineEdit_logicAddr->text().toShort(NULL, 16), dmsg.sourceAddr,  resp))
+            {
+                TcpData_Client->write(doipRes.Data());
+
+                qDebug() << "testrAddr:" << ui->lineEdit_logicAddr->text() << "DiagnosticMsg:" << doipRes.Data().toHex(' ');
+                ui->textBrowser->append("testrAddr:0x" + ui->lineEdit_logicAddr->text() + " DiagnosticMsg:" + doipRes.Data().toHex(' '));
+                ui->label_state->setText("RoutingActivationResponse suncc");
+            }
+            else
+                qDebug() << "creat RoutingActivationResponse pkg filed";
+        }
+        else
+            qDebug() << "DiagnosticMsgAnalyze failed";
+
     }
 }
 
@@ -256,6 +401,49 @@ void MainWindow::on_pushButton_start_clicked()
                 Discover_timer->stop();
         });
     }
+
+}
+
+
+void MainWindow::on_pushButton_add_col_clicked()
+{
+
+}
+
+
+void MainWindow::on_pushButton_add_row_clicked()
+{
+
+    QList<QStandardItem *> aitemlist;
+    QStandardItem *item;
+    for(int i=0;i<ECU_DID_model->columnCount()-1;i++){
+        item=new QStandardItem("0");
+        aitemlist<<item;
+    }
+    QString str=ECU_DID_model->headerData(ECU_DID_model->columnCount()-1,Qt::Horizontal).toString();
+    item=new QStandardItem(str);
+//    item->setCheckable(true);
+//    item->setBackground(QBrush(Qt::red));
+    aitemlist<<item;
+    ECU_DID_model->insertRow(ECU_DID_model->rowCount(),aitemlist);
+}
+
+
+void MainWindow::on_pushButton_del_col_clicked()
+{
+
+}
+
+
+void MainWindow::on_pushButton_del_row_clicked()
+{
+    QModelIndex curindex = ui->tableView_ECU_DID->currentIndex();
+    ECU_DID_model->removeRow(curindex.row());
+}
+
+
+void MainWindow::on_pushButton_ECU_DID_Refresh_clicked()
+{
 
 }
 

@@ -3,8 +3,46 @@
 #include <QString>
 #include <QDebug>
 
+doipPacket::doipPacket(quint16 payloadType, QByteArray &payload)
+{
+    _packet_is_ext = false;
+    creatHeader(payloadType, payload.size());
+    _packet->append(payload);
+}
+
+doipPacket::doipPacket()
+{
+    _packet_is_ext = false;
+    _packet = new QByteArray();
+}
+
+doipPacket::doipPacket(QByteArray &arr)
+{
+    _packet_is_ext = true;
+    _packet = &arr;
+}
+
+doipPacket::~doipPacket()
+{
+    if(!isUnchangeable())
+        delete _packet;
+}
+
+bool doipPacket::isUnchangeable()
+{
+    if(_packet_is_ext)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 bool doipPacket::creatHeader(quint16 payloadType, quint32 payloadSize)
 {
+    if(isUnchangeable())
+       return false;
+
     if(_packet)
         _packet->clear();
     else
@@ -26,30 +64,21 @@ bool doipPacket::creatHeader(quint16 payloadType, quint32 payloadSize)
     return true;
 }
 
-doipPacket::doipPacket(quint16 payloadType, QByteArray &payload)
-{
-    creatHeader(payloadType, payload.size());
-    _packet->append(payload);
-}
-
-doipPacket::doipPacket()
-{
-    _packet = new QByteArray();
-}
-
 QByteArray& doipPacket::Data(void)
 {
     return *this->_packet;
 }
 
-QByteArray& doipPacket::VehicleAnnouncement(QString VIN, quint16 logicalAddr,
+bool doipPacket::VehicleAnnouncement(QString VIN, quint16 logicalAddr,
                                             QByteArray EID, QByteArray GID,
                                             quint8 Fur, quint8 syncSta)
 {
     quint16 payloadType = 0x0004;
     quint32 payloadSize = 33;
 
-    creatHeader(payloadType, payloadSize);
+
+    if(!creatHeader(payloadType, payloadSize))
+        return false;
 
     // VehicleAnnouncement
     // VIN logicalAddr EID GID Fur syncSta
@@ -62,15 +91,16 @@ QByteArray& doipPacket::VehicleAnnouncement(QString VIN, quint16 logicalAddr,
     _packet->append(Fur);
     _packet->append(syncSta);
 
-    return *this->_packet;
+    return true;
 }
 
-QByteArray& doipPacket::RoutingActivationRequst(quint16 sourceAddr, quint8 activationType)
+bool doipPacket::RoutingActivationRequst(quint16 sourceAddr, quint8 activationType)
 {
     quint16 payloadType = 0x0005;
     quint32 payloadSize = 11;
 
-    creatHeader(payloadType, payloadSize);
+    if(!creatHeader(payloadType, payloadSize))
+        return false;
 
     // RoutingActivationRequst
     // sourceAddr activationType ISO OEM
@@ -81,15 +111,16 @@ QByteArray& doipPacket::RoutingActivationRequst(quint16 sourceAddr, quint8 activ
     _packet->append(QByteArray::fromHex("00000000"));
     _packet->append(QByteArray::fromHex("00000000"));
 
-    return *this->_packet;
+    return true;
 }
 
-QByteArray& doipPacket::RoutingActivationResponse(quint16 testerLogicalAddr, quint16 sourceAddr, quint8 respCode)
+bool doipPacket::RoutingActivationResponse(quint16 testerLogicalAddr, quint16 sourceAddr, quint8 respCode)
 {
     quint16 payloadType = 0x0006;
     quint32 payloadSize = 13;
 
-    creatHeader(payloadType, payloadSize);
+    if(!creatHeader(payloadType, payloadSize))
+        return false;
 
     // RoutingActivationResponse
     // testerLogicalAddr sourceAddr respCode ISO OEM
@@ -102,38 +133,35 @@ QByteArray& doipPacket::RoutingActivationResponse(quint16 testerLogicalAddr, qui
     _packet->append(QByteArray::fromHex("00000000"));
     _packet->append(QByteArray::fromHex("00000000"));
 
-    return *this->_packet;
+    return true;
 }
 
-bool doipPacket::isDoipPacket(QByteArray &arr)
+bool doipPacket::isDoipPacket()
 {
-    int size = arr.size();
     return false;
 }
 
-bool doipPacket::_getDoipHeader(QByteArray &arr, quint16 &payloadType, quint32 &payloadSize)
+bool doipPacket::_getDoipHeader(quint16 &payloadType, quint32 &payloadSize)
 {
     // DoIP Header
     // Version ~Versison payloadType payloadSize
     // 1B      1B        2B          4B
 
-    if(arr.size() < 8)
+    if(_packet->size() < 8)
         return false;
 
-    payloadType = arr.at(2) << 8 | arr.at(3);
-    payloadSize = arr.at(4) << 24 | arr.at(5) << 16 | arr.at(6) << 8 | arr.at(7);
-
-    qDebug() << "payloadType:0x" << QString::number(payloadType, 16) << "payloadSize:" << payloadSize;
+    payloadType = _packet->at(2) << 8 | _packet->at(3);
+    payloadSize = _packet->at(4) << 24 | _packet->at(5) << 16 | _packet->at(6) << 8 | _packet->at(7);
 
     return true;
 }
 
-bool doipPacket::isRoutingActivationRequst(QByteArray &arr)
+bool doipPacket::isRoutingActivationRequst()
 {
     quint16 payloadType;
     quint32 payloadSize;
 
-    if(!_getDoipHeader(arr, payloadType, payloadSize))
+    if(!_getDoipHeader(payloadType, payloadSize))
         return false;
 
 
@@ -143,25 +171,25 @@ bool doipPacket::isRoutingActivationRequst(QByteArray &arr)
     return true;
 }
 
-bool doipPacket::getSourceAddrFromRoutingActivationRequst(QByteArray &arr, quint16 &sourceAddr)
+bool doipPacket::getSourceAddrFromRoutingActivationRequst(quint16 &sourceAddr)
 {
-    if(!isRoutingActivationRequst(arr))
+    if(!isRoutingActivationRequst())
         return false;
 
     // RoutingActivationRequst
     // sourceAddr activationType ISO OEM
     //     2B     1B             4B  4B
-    sourceAddr = arr.at(8) << 8 | (arr.at(9) & 0xff);
+    sourceAddr = _packet->at(8) << 8 | (_packet->at(9) & 0xff);
     qDebug() << "sourceAddr:0x" << QString::number(sourceAddr, 16);
     return true;
 }
 
-bool doipPacket::isRoutingActivationResponse(QByteArray &arr)
+bool doipPacket::isRoutingActivationResponse()
 {
     quint16 payloadType;
     quint32 payloadSize;
 
-    if(!_getDoipHeader(arr, payloadType, payloadSize))
+    if(!_getDoipHeader(payloadType, payloadSize))
         return false;
 
     if(payloadType != 0x0006)
@@ -171,14 +199,11 @@ bool doipPacket::isRoutingActivationResponse(QByteArray &arr)
 }
 
 
-doipPacket::~doipPacket()
-{
-    delete _packet;
-}
 
-QByteArray &doipPacket::DiagnosticMsg(quint16 sourceAddr, quint16 targetAddr, QByteArray &udsData)
+bool doipPacket::DiagnosticMsg(quint16 sourceAddr, quint16 targetAddr, QByteArray &udsData)
 {
-    creatHeader(0x8001, udsData.size() + 4);
+    if(!creatHeader(0x8001, udsData.size() + 4))
+        return false;
 
     _packet->append(sourceAddr >> 8 & 0xff);
     _packet->append(sourceAddr >> 0 & 0xff);
@@ -187,15 +212,23 @@ QByteArray &doipPacket::DiagnosticMsg(quint16 sourceAddr, quint16 targetAddr, QB
 
     _packet->append(udsData);
 
-    return *this->_packet;
+    return true;
 }
 
-QByteArray &doipPacket::DiagnosticMsgACKorNACK(quint16 sourceAddr, quint16 targetAddr, quint8 type, quint8 code, QByteArray &udsData)
+bool doipPacket::DiagnosticMsgACKorNACK(quint16 sourceAddr, quint16 targetAddr, quint8 type, quint8 code, QByteArray &udsData)
 {
+    quint16 payloadType;
+    quint32 payloadSize;
+
+
     if(type == doipPacket::ACK)
-        creatHeader(0x8002, udsData.size() + 5);
+        payloadType = 0x8002;
     else
-        creatHeader(0x8003, udsData.size() + 5);
+        payloadType = 0x8003;
+
+    payloadSize = udsData.size() + 5;
+    if(!creatHeader(payloadType, payloadSize))
+        return false;
 
     _packet->append(sourceAddr >> 8 & 0xff);
     _packet->append(sourceAddr >> 0 & 0xff);
@@ -206,17 +239,17 @@ QByteArray &doipPacket::DiagnosticMsgACKorNACK(quint16 sourceAddr, quint16 targe
     if(udsData.size() != 0)
         _packet->append(udsData);
 
-    return *this->_packet;
+    return true;
 }
 
-QByteArray &doipPacket::DiagnosticMsgACK(quint16 sourceAddr, quint16 targetAddr, quint8 code)
+bool doipPacket::DiagnosticMsgACK(quint16 sourceAddr, quint16 targetAddr, quint8 code)
 {
     QByteArray tmp;
     tmp.clear();
     return DiagnosticMsgACKorNACK(sourceAddr, targetAddr, doipPacket::ACK, code, tmp);
 }
 
-QByteArray &doipPacket::DiagnosticMsgACK(quint16 sourceAddr, quint16 targetAddr, quint8 code, QByteArray &udsData)
+bool doipPacket::DiagnosticMsgACK(quint16 sourceAddr, quint16 targetAddr, quint8 code, QByteArray &udsData)
 {
     return DiagnosticMsgACKorNACK(sourceAddr, targetAddr, doipPacket::ACK, code, udsData);
 }
@@ -236,16 +269,71 @@ QByteArray &doipPacket::DiagnosticMsgACK(quint16 sourceAddr, quint16 targetAddr,
  *          0x08: 传输层错误
  * @return
  */
-QByteArray &doipPacket::DiagnosticMsgNACK(quint16 sourceAddr, quint16 targetAddr, quint8 code)
+bool doipPacket::DiagnosticMsgNACK(quint16 sourceAddr, quint16 targetAddr, quint8 code)
 {
     QByteArray tmp;
     tmp.clear();
     return DiagnosticMsgACKorNACK(sourceAddr, targetAddr, doipPacket::NACK, code, tmp);
 }
 
-QByteArray &doipPacket::DiagnosticMsgNACK(quint16 sourceAddr, quint16 targetAddr, quint8 code, QByteArray &udsData)
+bool doipPacket::DiagnosticMsgNACK(quint16 sourceAddr, quint16 targetAddr, quint8 code, QByteArray &udsData)
 {
     return DiagnosticMsgACKorNACK(sourceAddr, targetAddr, doipPacket::NACK, code, udsData);
 }
 
+bool doipPacket::isDiagnosticMsg()
+{
+    quint16 payloadType;
+    quint32 payloadSize;
 
+    if(!_getDoipHeader(payloadType, payloadSize))
+        return false;
+
+    if((payloadType != 0x8001)
+        && (payloadType != 0x8002)
+        && (payloadType != 0x8003))
+        return false;
+
+    return true;
+}
+
+bool doipPacket::DiagnosticMsgAnalyze(struct DiagnosticMsg &diagInfo)
+{
+    if(!isDiagnosticMsg())
+        return false;
+
+    quint16 payloadType = _packet->at(2) << 8 | _packet->at(3);
+    quint32 start_index = 0;
+
+    if(payloadType == 0x8001)
+    {
+        diagInfo.type = MSG;
+        start_index = 12;
+    }
+    else if(payloadType == 0x8002)
+    {
+        diagInfo.type = ACK;
+        diagInfo.code = (_packet->at(12) & 0xff);
+        start_index = 13;
+    }
+    else if(payloadType == 0x8003)
+    {
+        diagInfo.type = NACK;
+        diagInfo.code = (_packet->at(12) & 0xff);
+        start_index = 13;
+    }
+    else
+    {
+        qDebug() << "UNKNOWN type:0x" << QString::number(payloadType, 16);
+        diagInfo.type = UNKNOWN;
+        return false;
+    }
+
+    diagInfo.sourceAddr = _packet->at(8) << 8 | (_packet->at(9) & 0xff);
+    diagInfo.targetAddr = _packet->at(10) << 8 | (_packet->at(11) & 0xff);
+
+    diagInfo.udsData.clear();
+    diagInfo.udsData = _packet->mid(start_index, _packet->size()-start_index);  // TODO: 拷贝数据
+
+    return true;
+}
