@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>859</width>
-    <height>601</height>
+    <width>849</width>
+    <height>613</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -26,7 +26,7 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QGridLayout" name="gridLayout_5">
+   <layout class="QGridLayout" name="gridLayout_3">
     <item row="0" column="0">
      <layout class="QVBoxLayout" name="verticalLayout_5">
       <item>
@@ -287,58 +287,102 @@
        </layout>
       </item>
       <item>
-       <widget class="QGroupBox" name="groupBox_4">
-        <property name="title">
-         <string>ECU_DID</string>
+       <widget class="QTabWidget" name="tabWidget">
+        <property name="currentIndex">
+         <number>0</number>
         </property>
-        <layout class="QGridLayout" name="gridLayout_3">
-         <item row="0" column="0">
-          <layout class="QHBoxLayout" name="horizontalLayout_10">
-           <item>
-            <widget class="QTableView" name="tableView_ECU_DID"/>
-           </item>
-           <item>
-            <layout class="QVBoxLayout" name="verticalLayout_6">
-             <item>
-              <widget class="QPushButton" name="pushButton_add_col">
-               <property name="text">
-                <string>添加列</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="pushButton_add_row">
-               <property name="text">
-                <string>添加行</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="pushButton_del_col">
-               <property name="text">
-                <string>删除列</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="pushButton_del_row">
-               <property name="text">
-                <string>删除行</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QPushButton" name="pushButton_ECU_DID_Refresh">
-               <property name="text">
-                <string>刷新</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-          </layout>
-         </item>
-        </layout>
+        <widget class="QWidget" name="tab">
+         <attribute name="title">
+          <string>DID</string>
+         </attribute>
+         <layout class="QGridLayout" name="gridLayout_5">
+          <item row="0" column="0">
+           <layout class="QHBoxLayout" name="horizontalLayout_10">
+            <item>
+             <widget class="QTableView" name="tableView_ECU_DID"/>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_6">
+              <item>
+               <widget class="QPushButton" name="pushButton_add_col">
+                <property name="text">
+                 <string>添加列</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_add_row">
+                <property name="text">
+                 <string>添加行</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_del_col">
+                <property name="text">
+                 <string>删除列</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_del_row">
+                <property name="text">
+                 <string>删除行</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_ECU_DID_Refresh">
+                <property name="text">
+                 <string>刷新</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+        <widget class="QWidget" name="tab_2">
+         <attribute name="title">
+          <string>DTC</string>
+         </attribute>
+         <layout class="QGridLayout" name="gridLayout_6">
+          <item row="0" column="0">
+           <layout class="QHBoxLayout" name="horizontalLayout_11">
+            <item>
+             <widget class="QTableView" name="tableView_ECU_DTC"/>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="verticalLayout_7">
+              <item>
+               <widget class="QPushButton" name="pushButton_DTC_add_row">
+                <property name="text">
+                 <string>添加行</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_DTC_del_row">
+                <property name="text">
+                 <string>删除行</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="pushButton_ECU_DTC_Refresh">
+                <property name="text">
+                 <string>刷新</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
        </widget>
       </item>
       <item>
@@ -357,7 +401,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>859</width>
+     <width>849</width>
      <height>21</height>
     </rect>
    </property>

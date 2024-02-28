@@ -39,13 +39,13 @@ DoIP服务端
 
 DoIP客户端
 
-
-
 ## UDS相关
 
 0x22服务：
 
 [汽车UDS诊断之通过标识符读取数据服务（0x22）深度剖析_uds 0x22-CSDN博客](http://t.csdnimg.cn/AW4Vu)
+
+### DID相关
 
 DID: （Diagnostic Identifier）是一种标识符，用于唯一标识诊断服务或功能。这个值是由车辆制造商自己定义的。
 
@@ -58,6 +58,12 @@ DID: （Diagnostic Identifier）是一种标识符，用于唯一标识诊断服
 UDS请求报文：22 F1 90
 
 UDS响应报文：62 F1 90 30 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 (17字节的ASCII码VIN “01234567890123456”)
+
+### DTC相关
+
+
+
+参考：[DTC及状态掩码_dtc规则-CSDN博客](http://t.csdnimg.cn/yCPEc)
 
 
 

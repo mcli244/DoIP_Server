@@ -6,7 +6,58 @@
 #include <QTimer>
 #include <QStandardItemModel>
 #include <QThread>
+#include <QItemDelegate>
+#include <QStyleOptionViewItem>
 
+class ReadOnlyDelegate: public QItemDelegate
+{
+
+public:
+    ReadOnlyDelegate(QWidget *parent = NULL):QItemDelegate(parent)
+    {}
+
+    QWidget *createEditor(QWidget *parent, const QStyleOptionViewItem &option,
+const QModelIndex &index) const override //final
+    {
+        Q_UNUSED(parent)
+        Q_UNUSED(option)
+        Q_UNUSED(index)
+        return NULL;
+    }
+};
+
+class UserIDDelegate : public QItemDelegate
+{
+
+public:
+    UserIDDelegate(QObject* parent = 0) : QItemDelegate(parent) { }
+    QWidget* createEditor(QWidget* parent, const QStyleOptionViewItem& option,
+        const QModelIndex& index) const
+    {
+        QLineEdit* editor = new QLineEdit(parent);
+        QRegExp regExp("^[PCBU]\\d{4}$");
+        editor->setValidator(new QRegExpValidator(regExp, parent));
+        return editor;
+    }
+    void setEditorData(QWidget* editor, const QModelIndex& index) const
+    {
+        QString text = index.model()->data(index, Qt::EditRole).toString();
+        QLineEdit* lineEdit = static_cast<QLineEdit*>(editor);
+        lineEdit->setText(text);
+    }
+    void setModelData(QWidget* editor, QAbstractItemModel* model,
+        const QModelIndex& index) const
+    {
+        QLineEdit* lineEdit = static_cast<QLineEdit*>(editor);
+        QString text = lineEdit->text();
+        model->setData(index, text, Qt::EditRole);
+    }
+    void updateEditorGeometry(QWidget* editor,
+        const QStyleOptionViewItem& option, const QModelIndex& index) const
+    {
+        editor->setGeometry(option.rect);
+    }
+};
 
 
 MainWindow::MainWindow(QWidget *parent)
@@ -19,18 +70,9 @@ MainWindow::MainWindow(QWidget *parent)
     // 禁用 车辆声明广播按钮
     ui->pushButton->setEnabled(false);
 
-    // ECU DID
-    // 创建一个标准的表格模型
-    ECU_DID_model = new QStandardItemModel(0,3);
-    ECU_DID_model->setHorizontalHeaderLabels(QStringList() << "DID" << "值" << "描述");
 
-    ECU_DID_model->setItem(0, 0, new QStandardItem("0xF190"));
-    ECU_DID_model->setItem(0, 1, new QStandardItem(ui->lineEdit_VIN->text()));
-    ECU_DID_model->setItem(0, 2, new QStandardItem("标识VIN码"));
-
-    ui->tableView_ECU_DID->setModel(ECU_DID_model);
-    ui->tableView_ECU_DID->resizeColumnsToContents();
-    ui->tableView_ECU_DID->show();
+    initDID();
+    initDTC();
 
     // DOIP报文测试
     doipPacket doipPkg;
@@ -63,6 +105,152 @@ MainWindow::~MainWindow()
 {
     delete ui;
 }
+
+
+void MainWindow::initDID(void)
+{
+    // ECU DID
+    // 创建一个标准的表格模型
+    ECU_DID_model = new QStandardItemModel(0,3);
+    ECU_DID_model->setHorizontalHeaderLabels(QStringList() << "DID" << "值" << "描述");
+
+    ECU_DID_model->setItem(0, 0, new QStandardItem("0xF190"));
+    ECU_DID_model->setItem(0, 1, new QStandardItem(ui->lineEdit_VIN->text()));
+    ECU_DID_model->setItem(0, 2, new QStandardItem("标识VIN码"));
+
+    ui->tableView_ECU_DID->setModel(ECU_DID_model);
+    ui->tableView_ECU_DID->resizeColumnsToContents();
+    ui->tableView_ECU_DID->show();
+}
+
+bool MainWindow::DTCToBytes(QString dtc, quint8 &DTCHighByte, quint8 &DTCMiddleByte)
+{
+    quint8 tmp = 0;
+
+    if(dtc.size() < 5)  return false;
+
+    switch(dtc.at(0).toLatin1())
+    {
+        case 'P':   tmp = 0; break;
+        case 'C':   tmp = 1; break;
+        case 'B':   tmp = 2; break;
+        case 'U':   tmp = 3; break;
+        default: return false;
+    }
+
+    DTCHighByte = 0;
+    DTCHighByte |= tmp << 6;
+
+    tmp = dtc.mid(1, 1).toInt() & 0xff;
+    DTCHighByte |= tmp << 4;
+
+    tmp = dtc.mid(2, 1).toInt() & 0xff;
+    DTCHighByte |= tmp;
+
+    tmp = dtc.mid(3, 2).toInt(NULL, 16) & 0xff;
+    DTCMiddleByte = tmp;
+
+//    qDebug() << "DTCHighByte:0x" << QString::number(DTCHighByte, 16)
+//             << "DTCMiddleByte:0x" << QString::number(DTCMiddleByte, 16);
+
+    return true;
+}
+
+void MainWindow::initDTC(void)
+{
+    /* DTC故障码描述
+            |  DTCHighByte(Hex)        |DTCMiddleByte(Hex)| DTCLowByte(Hex) | StatusOfDTC(Hex)|
+      BIT   |15 14 | 13 12 | 11 10 9 8 | 7 6 5 4 3 2 1 0  | 7 6 5 4 3 2 1 0 | 7 6 5 4 3 2 1 0 |
+
+      DTCHighByte(15:8):
+          bit[15:14]: 一位字符
+            00: 'P'     Powertrain 动力系统故障
+            01: 'C'     Chassis 底盘故障
+            10: 'B'     Body 车身故障
+            11: 'U'     Network 网络故障
+
+          bit[13:12]: 一位字符
+            00: '0'     ISO/SAE 标准定义的故障码
+            01: '1'     制造商自定义的故障码
+            10: '2'     ISO/SAE 标准定义的故障码
+            11: '3'     ISO/SAE 保留
+
+          bit[11:8]: 一位字符 （只有0-8）
+            0000: “0”表示燃油和空气计量辅助排放控制整个系统
+            0001: “1”表示燃油和空气计量系统；
+            0010: “2”表示燃油和空气计量系统(喷油器)；
+            0011: “3”表示点火系统；
+            0100: “4”表示废气控制系统；
+            0101: “5”表示巡航、怠速控制系统；
+            0110: “6”表示与控制单元相关；
+            0111: "7"表示变速箱系统等。
+            1000: “8”表示变速箱系统等。
+            其他： 保留
+      DTCMiddleByte(7:0):
+        表示具体故障对象和类型。
+
+    */
+
+    // ECU DTC
+    // 创建一个标准的表格模型 P0128 - 0000
+    quint8 DTCHighByte;
+    quint8 DTCMiddleByte;
+    QString code = "P0128";
+
+    DTCToBytes(code, DTCHighByte, DTCMiddleByte);
+
+    ECU_DTC_model = new QStandardItemModel(0,6);
+    ECU_DTC_model->setHorizontalHeaderLabels(QStringList()
+                                             << "五位标准故障码"
+                                             << "DTCHighByte(Hex)"
+                                             << "DTCMiddleByte(Hex)"
+                                             << "DTCLowByte(Hex)"
+                                             << "StatusOfDTC(Hex)"
+                                             << "描述");
+    ECU_DTC_model->setItem(0, 0, new QStandardItem(code));
+    ECU_DTC_model->setItem(0, 1, new QStandardItem(QString::asprintf("0x%02X", DTCHighByte)));
+    ECU_DTC_model->setItem(0, 2, new QStandardItem(QString::asprintf("0x%02X", DTCMiddleByte)));
+    ECU_DTC_model->setItem(0, 3, new QStandardItem("0x00"));
+    ECU_DTC_model->setItem(0, 4, new QStandardItem("0x00"));
+    ECU_DTC_model->setItem(0, 5, new QStandardItem("发动机温度过低"));
+
+    //设置某列只读
+    ReadOnlyDelegate* readOnlyDelegate = new ReadOnlyDelegate();
+    ui->tableView_ECU_DTC->setItemDelegateForColumn(1, readOnlyDelegate);
+    ui->tableView_ECU_DTC->setItemDelegateForColumn(2, readOnlyDelegate);
+
+    // 只允许输入以PCBU字符开头，后面跟4个数字的数据
+    UserIDDelegate* UserID = new UserIDDelegate();
+    ui->tableView_ECU_DTC->setItemDelegateForColumn(0, UserID);
+
+    ui->tableView_ECU_DTC->setModel(ECU_DTC_model);
+    ui->tableView_ECU_DTC->resizeColumnsToContents();
+    ui->tableView_ECU_DTC->show();
+
+    connect(ECU_DTC_model, &QStandardItemModel::itemChanged, [=](){
+        // 当标准错误码改变后，刷新DTCHighByte和DTCMidelByte
+        QModelIndex index = ui->tableView_ECU_DTC->currentIndex();
+        if(index.column() != 0)
+            return;
+
+        QString Code = ECU_DTC_model->data(ECU_DTC_model->index(index.row(), 0)).toString().trimmed();  // 去掉前面的空格
+
+        qDebug() << "index:" << index.row() << index.column();
+
+        quint8 DTCHighByte;
+        quint8 DTCMiddleByte;
+
+        ui->tableView_ECU_DTC->setCurrentIndex(ECU_DTC_model->index(index.row(), 3));   // 这个很重要 且放在setItem之前 这样这个信号就只会触发两次
+        if(DTCToBytes(Code, DTCHighByte, DTCMiddleByte))
+        {
+            // TODO：这里可以优化，因为每次setItem,都将触发QStandardItemModel::itemChanged信号，这里会进入三次这个处理函数
+            ECU_DTC_model->setItem(index.row(), 0, new QStandardItem(Code));
+            ECU_DTC_model->setItem(index.row(), 1, new QStandardItem(QString::asprintf("0x%02X", DTCHighByte)));
+            ECU_DTC_model->setItem(index.row(), 2, new QStandardItem(QString::asprintf("0x%02X", DTCMiddleByte)));
+        }
+    });
+}
+
 
 void MainWindow::iface_refresh()
 {
@@ -150,7 +338,6 @@ bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
     QByteArray value;
 
     switch (sid) {
-    case 0x10:  break;
     case 0x22:
         // 获取DID
         if(uds.size() > 3)
@@ -172,12 +359,21 @@ bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
             resp.append(uds.mid(1, uds.size() > 3 ? 4:2));
             resp.append(value);
         }
+        else
+        {
+            resp.append(0x7f);
+            resp.append(sid);
+            resp.append(doipPacket::requestOutOfRange);
+        }
         break;
     default:
+        resp.append(0x7f);
+        resp.append(sid);
+        resp.append(doipPacket::ServiceNotSupported);  // sid不支持
         break;
     }
 
-
+    return true;
 }
 
 void MainWindow::DiagnosticMsgPro(struct doipPacket::DiagnosticMsg &dmsg, QByteArray &resp)
@@ -381,9 +577,9 @@ void MainWindow::on_pushButton_start_clicked()
         ui->label_state->setText("DoIP Server is running");
         ui->pushButton_start->setText("停止");
 
-        // 启动定时器，间隔150ms发送车辆声明 (DOIP协议约定，在500ms内，发送三次)
+        // 启动定时器，间隔500ms发送车辆声明
         Discover_timer = new QTimer();
-        Discover_timer->setInterval(150);
+        Discover_timer->setInterval(500);
         Discover_timer->start();
         connect(Discover_timer, &QTimer::timeout, [=](){
             static int cnt = 0;
@@ -445,5 +641,27 @@ void MainWindow::on_pushButton_del_row_clicked()
 void MainWindow::on_pushButton_ECU_DID_Refresh_clicked()
 {
 
+}
+
+
+void MainWindow::on_pushButton_DTC_add_row_clicked()
+{
+    QList<QStandardItem *> aitemlist;
+    QStandardItem *item;
+    for(int i=0;i<ECU_DTC_model->columnCount()-1;i++){
+        item=new QStandardItem(" ");
+        aitemlist<<item;
+    }
+    QString str=ECU_DTC_model->headerData(ECU_DTC_model->columnCount()-1,Qt::Horizontal).toString();
+    item=new QStandardItem(str);
+    aitemlist<<item;
+    ECU_DTC_model->insertRow(ECU_DTC_model->rowCount(),aitemlist);
+}
+
+
+void MainWindow::on_pushButton_DTC_del_row_clicked()
+{
+    QModelIndex curindex = ui->tableView_ECU_DTC->currentIndex();
+    ECU_DTC_model->removeRow(curindex.row());
 }
 

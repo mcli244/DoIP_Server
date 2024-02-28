@@ -6,7 +6,7 @@
 #include <QTcpSocket>
 #include <QTcpServer>
 #include <QStandardItemModel>
-
+#include <QString>
 #include "doip.h"
 
 QT_BEGIN_NAMESPACE
@@ -45,6 +45,10 @@ private slots:
 
     void on_pushButton_ECU_DID_Refresh_clicked();
 
+    void on_pushButton_DTC_add_row_clicked();
+
+    void on_pushButton_DTC_del_row_clicked();
+
 private:
     Ui::MainWindow *ui;
     QUdpSocket *Discover_Socket = NULL;
@@ -56,9 +60,14 @@ private:
 
     QTimer *Discover_timer = NULL;
     QStandardItemModel *ECU_DID_model;
+    QStandardItemModel *ECU_DTC_model;
 
     bool DiagnosticMsgPro(QByteArray &uds, QByteArray &resp);
     bool getValueByDID(quint32 did, QByteArray &value);
     void DiagnosticMsgPro(struct doipPacket::DiagnosticMsg &dmsg, QByteArray &resp);
+    void initDTC(void);
+    void initDID(void);
+    bool DTCToBytes(QString dtc, quint8 &DTCHighByte, quint8 &DTCMiddleByte);
+    void DTCInfoRefresh(void);
 };
 #endif // MAINWINDOW_H
