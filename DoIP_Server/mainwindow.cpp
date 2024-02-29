@@ -505,6 +505,20 @@ void MainWindow::readPendingDatagrams()
         //显示
         qDebug() << "IP:" << addr.toString() << " Prot:" << QString::number(port) << "DOIP Packet:" << arr.toHex(' ');
         ui->textBrowser->append("IP:"+addr.toString() + " Port:" + QString::number(port) + "recv:" + arr.toHex(' '));
+        doipPacket request(arr);
+
+        if(request.isVehicleIdentificationRequest())
+        {
+            QString VIN;
+            QByteArray EID;
+            if(request.VehicleIdentificationRequestAnalyze(VIN, EID))
+            {
+                // 对比自己的VIN或者EID
+            }
+            QString inf = "Recv VehicleIdentificationRequest " + addr.toString() + ":" + QString::number(port);
+            ui->textBrowser->append(inf);
+            sendVehicleAnnouncement(addr, port);
+        }
     }
 
 }

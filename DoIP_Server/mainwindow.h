@@ -7,7 +7,7 @@
 #include <QTcpServer>
 #include <QStandardItemModel>
 #include <QString>
-#include "doip.h"
+#include "../comm/doip.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }

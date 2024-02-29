@@ -50,6 +50,18 @@ class doipPacket
         QByteArray udsData;
     };
 
+    struct VehicleAnnouncement
+    {
+        QString VIN;
+        quint16 logicalAddr;
+        QByteArray EID;
+        QByteArray GID;
+        quint8 Fur;
+        quint8 syncSta;
+    };
+
+    const int DoIPHeaderLen = 8;
+
     // 外部传进来数据，不可改动，仅能解析
     doipPacket(QByteArray &arr);
     bool isUnchangeable();
@@ -62,9 +74,16 @@ class doipPacket
     bool creatHeader(quint16 payloadType, quint32 payloadSize);
 
     QByteArray& Data(void);
+
+    bool isVehicleIdentificationRequest();
+    bool VehicleIdentificationRequestAnalyze(QString &VIN, QByteArray &EID);
+    bool VehicleIdentificationRequest();
+    bool VehicleIdentificationRequest(QString VIN);
+    bool VehicleIdentificationRequest(QByteArray EID);
     bool VehicleAnnouncement(QString VIN, quint16 logicalAddr,
                                     QByteArray EID, QByteArray GID,
                                     quint8 Fur, quint8 syncSta);
+    bool VehicleAnnouncementAnalyze(struct VehicleAnnouncement &vic);
     bool RoutingActivationRequst(quint16 sourceAddr, quint8 activationType);
     bool RoutingActivationResponse(quint16 testerLogicalAddr, quint16 sourceAddr, quint8 respCode);
 

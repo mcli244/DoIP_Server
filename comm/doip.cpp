@@ -337,3 +337,99 @@ bool doipPacket::DiagnosticMsgAnalyze(struct DiagnosticMsg &diagInfo)
 
     return true;
 }
+
+bool doipPacket::VehicleIdentificationRequest()
+{
+    quint16 payloadType = 0x0001;
+    quint32 payloadSize = 0;
+
+    if(!creatHeader(payloadType, payloadSize))
+        return false;
+
+    return true;
+}
+
+bool doipPacket::VehicleIdentificationRequest(QString VIN)
+{
+    quint16 payloadType = 0x0003;
+    quint32 payloadSize = 17;
+
+    if(!creatHeader(payloadType, payloadSize))
+        return false;
+
+    _packet->append(VIN.mid(0, payloadSize).toUtf8());
+
+    return true;
+}
+
+bool doipPacket::VehicleIdentificationRequest(QByteArray EID)
+{
+    quint16 payloadType = 0x0002;
+    quint32 payloadSize = 6;
+
+    if(!creatHeader(payloadType, payloadSize))
+        return false;
+
+    _packet->append(EID.mid(0, payloadSize));
+
+    return true;
+}
+
+bool doipPacket::isVehicleIdentificationRequest()
+{
+    quint16 payloadType;
+    quint32 payloadSize;
+
+    if(!_getDoipHeader(payloadType, payloadSize))
+        return false;
+
+    if(payloadType != 0x0001 && payloadType != 0x0002 && payloadType != 0x0003)
+        return false;
+
+    return true;
+}
+
+bool doipPacket::VehicleIdentificationRequestAnalyze(QString &VIN, QByteArray &EID)
+{
+    if(!isVehicleIdentificationRequest())
+        return false;
+
+    if(_packet->size() <= DoIPHeaderLen)
+        return false;
+
+    quint16 payloadType;
+    quint32 payloadSize;
+
+    if(!_getDoipHeader(payloadType, payloadSize))
+        return false;
+
+    if(payloadType == 0x0002)
+        VIN = _packet->mid(DoIPHeaderLen, 17);
+    else if(payloadType == 0x0003)
+        EID = _packet->mid(DoIPHeaderLen, 6);
+    else
+        return false;
+
+    return true;
+}
+
+bool doipPacket::VehicleAnnouncementAnalyze(struct VehicleAnnouncement &vic)
+{
+    quint16 payloadType;
+    quint32 payloadSize;
+
+    if(!_getDoipHeader(payloadType, payloadSize))
+        return false;
+
+    if(payloadType != 0x0004)
+        return false;
+
+    vic.VIN = _packet->mid(DoIPHeaderLen, 17);
+    vic.logicalAddr = _packet->at(25) << 8 | (_packet->at(26) & 0xff);
+    vic.EID = _packet->mid(27, 6);
+    vic.GID = _packet->mid(33, 6);
+    vic.Fur = _packet->mid(39, 1).toInt();
+    vic.syncSta = _packet->mid(40, 1).toInt();
+    return true;
+}
+
