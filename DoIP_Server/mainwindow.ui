@@ -71,7 +71,7 @@
                  <item>
                   <widget class="QLineEdit" name="lineEdit_logicAddr">
                    <property name="text">
-                    <string>0E80</string>
+                    <string>0E00</string>
                    </property>
                    <property name="maxLength">
                     <number>4</number>
@@ -396,6 +396,7 @@
     </item>
    </layout>
   </widget>
+  <widget class="QStatusBar" name="statusbar"/>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
@@ -405,8 +406,13 @@
      <height>21</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuTester">
+    <property name="title">
+     <string>ECU</string>
+    </property>
+   </widget>
+   <addaction name="menuTester"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <resources/>
  <connections/>

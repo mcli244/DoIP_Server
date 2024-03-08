@@ -74,6 +74,7 @@ class doipPacket
     bool creatHeader(quint16 payloadType, quint32 payloadSize);
 
     QByteArray& Data(void);
+    bool isDoipPacket();
 
     bool isVehicleIdentificationRequest();
     bool VehicleIdentificationRequestAnalyze(QString &VIN, QByteArray &EID);
@@ -84,8 +85,6 @@ class doipPacket
                                     QByteArray EID, QByteArray GID,
                                     quint8 Fur, quint8 syncSta);
     bool VehicleAnnouncementAnalyze(struct VehicleAnnouncement &vic);
-    bool RoutingActivationRequst(quint16 sourceAddr, quint8 activationType);
-    bool RoutingActivationResponse(quint16 testerLogicalAddr, quint16 sourceAddr, quint8 respCode);
 
     bool isDiagnosticMsg();
     bool DiagnosticMsg(quint16 sourceAddr, quint16 targetAddr, QByteArray &udsData);
@@ -95,9 +94,11 @@ class doipPacket
     bool DiagnosticMsgNACK(quint16 sourceAddr, quint16 targetAddr, quint8 code, QByteArray &udsData);
     bool DiagnosticMsgAnalyze(struct DiagnosticMsg &diagInfo);
 
-    bool isDoipPacket();
     bool isRoutingActivationRequst();
     bool isRoutingActivationResponse();
+    bool RoutingActivationRequst(quint16 sourceAddr, quint8 activationType);
+    bool RoutingActivationResponse(quint16 testerLogicalAddr, quint16 sourceAddr, quint8 respCode);
+    bool RoutingActivationResponseAnalyze(quint16 &testerLogicalAddr, quint16 &sourceAddr, quint8 &respCode);
     bool getSourceAddrFromRoutingActivationRequst(quint16 &sourceAddr);
 
   private:

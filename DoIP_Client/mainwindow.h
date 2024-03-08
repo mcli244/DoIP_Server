@@ -7,6 +7,7 @@
 #include <QTcpServer>
 #include <QStandardItemModel>
 #include <QString>
+#include <QNetworkProxy>
 #include "../comm/doip.h"
 
 QT_BEGIN_NAMESPACE
@@ -40,15 +41,27 @@ private slots:
 
     void iface_refresh();
 
+    void on_pushButton_vic_connect_clicked();
+
+    void on_pushButton_4_clicked();
+
+    void on_pushButton_readDID_clicked();
+
+    void on_pushButton_readDID_2_clicked();
+
+    void on_pushButton_readDTC_clicked();
+
 private:
     Ui::MainWindow *ui;
     QUdpSocket *Discover_Socket = NULL;
     QTcpSocket *TcpData_Client = NULL;
-    QHostAddress TcpData_Server_addr;
-    quint16 TcpData_Server_port;
+    VehicleInfo *curVIC = NULL;
     bool runing = false;
 
     QStandardItemModel *ECU_List_model;
     QList<VehicleInfo> vicInfoList;
+    bool vicIsConnect = false;
+    bool BytesToDTC(QByteArray &dtc, QString &str);
+    bool udsPrint(QByteArray &uds, QString &inf);
 };
 #endif // MAINWINDOW_H

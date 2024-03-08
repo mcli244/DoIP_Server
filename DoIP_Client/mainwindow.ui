@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>589</width>
-    <height>480</height>
+    <width>710</width>
+    <height>524</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -57,13 +57,6 @@
              <string>操作</string>
             </property>
             <layout class="QGridLayout" name="gridLayout">
-             <item row="2" column="0">
-              <widget class="QPushButton" name="pushButton_2">
-               <property name="text">
-                <string>路由激活</string>
-               </property>
-              </widget>
-             </item>
              <item row="0" column="0">
               <layout class="QVBoxLayout" name="verticalLayout">
                <item>
@@ -78,7 +71,7 @@
                  <item>
                   <widget class="QLineEdit" name="lineEdit_logicAddr">
                    <property name="text">
-                    <string>0E80</string>
+                    <string>0E01</string>
                    </property>
                    <property name="maxLength">
                     <number>4</number>
@@ -92,21 +85,7 @@
                </item>
               </layout>
              </item>
-             <item row="1" column="0">
-              <widget class="QPushButton" name="pushButton">
-               <property name="text">
-                <string>车辆发现</string>
-               </property>
-              </widget>
-             </item>
-             <item row="3" column="0">
-              <widget class="QPushButton" name="pushButton_3">
-               <property name="text">
-                <string>读取VIN</string>
-               </property>
-              </widget>
-             </item>
-             <item row="4" column="0">
+             <item row="2" column="0">
               <layout class="QHBoxLayout" name="horizontalLayout_2">
                <item>
                 <widget class="QLabel" name="label">
@@ -116,12 +95,37 @@
                 </widget>
                </item>
                <item>
-                <widget class="QLineEdit" name="lineEdit"/>
+                <widget class="QLineEdit" name="lineEdit_DID"/>
                </item>
                <item>
-                <widget class="QPushButton" name="pushButton_4">
+                <widget class="QPushButton" name="pushButton_readDID">
                  <property name="text">
                   <string>读取DID</string>
+                 </property>
+                </widget>
+               </item>
+              </layout>
+             </item>
+             <item row="3" column="0">
+              <layout class="QHBoxLayout" name="horizontalLayout_4">
+               <item>
+                <widget class="QLabel" name="label_3">
+                 <property name="text">
+                  <string>DTC</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QLineEdit" name="lineEdit_DTC">
+                 <property name="placeholderText">
+                  <string>状态掩码</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="pushButton_readDTC">
+                 <property name="text">
+                  <string>读取DTC</string>
                  </property>
                 </widget>
                </item>
@@ -171,7 +175,7 @@
                  <item>
                   <widget class="QLineEdit" name="lineEdit_UDP_DISCOVER">
                    <property name="text">
-                    <string>13400</string>
+                    <string>0</string>
                    </property>
                   </widget>
                  </item>
@@ -221,16 +225,45 @@
        </layout>
       </item>
       <item>
-       <widget class="QGroupBox" name="groupBox_4">
-        <property name="title">
-         <string>车辆列表</string>
-        </property>
-        <layout class="QGridLayout" name="gridLayout_3">
-         <item row="0" column="0">
-          <widget class="QTableView" name="tableView_ECU_List"/>
-         </item>
-        </layout>
-       </widget>
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <item>
+         <widget class="QGroupBox" name="groupBox_4">
+          <property name="title">
+           <string>车辆列表</string>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_3">
+           <item row="0" column="0">
+            <widget class="QTableView" name="tableView_ECU_List"/>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <layout class="QVBoxLayout" name="verticalLayout_6">
+          <item>
+           <widget class="QPushButton" name="pushButton">
+            <property name="text">
+             <string>车辆发现</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_vic_connect">
+            <property name="text">
+             <string>车辆连接</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="pushButton_3">
+            <property name="text">
+             <string>读取VIN</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+       </layout>
       </item>
       <item>
        <widget class="QLabel" name="label_state">
@@ -248,10 +281,16 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>589</width>
+     <width>710</width>
      <height>21</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menuTester">
+    <property name="title">
+     <string>Tester</string>
+    </property>
+   </widget>
+   <addaction name="menuTester"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
  </widget>

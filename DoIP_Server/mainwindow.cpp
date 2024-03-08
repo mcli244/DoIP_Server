@@ -74,30 +74,6 @@ MainWindow::MainWindow(QWidget *parent)
     initDID();
     initDTC();
 
-    // DOIP报文测试
-    doipPacket doipPkg;
-
-    doipPkg.RoutingActivationRequst(0x0e01, 1);
-    qDebug() << "DOIP RoutingActivationRequst Packet:" << doipPkg.Data().toHex(' ');
-
-    doipPkg.DiagnosticMsgACK(0x0e01, 0x0DFF, 0x00);
-    qDebug() << "DOIP DiagnosticMsgACK Packet:" << doipPkg.Data().toHex(' ');
-
-    doipPkg.DiagnosticMsgNACK(0x0e01, 0x0DFF, 0x02);
-    qDebug() << "DOIP DiagnosticMsgNACK Packet:" << doipPkg.Data().toHex(' ');
-
-    QByteArray udsData = QByteArray::fromHex("1001");
-    doipPkg.DiagnosticMsg(0x0e01, 0x0DFF, udsData);
-    qDebug() << "DOIP DiagnosticMsg Packet:" << doipPkg.Data().toHex(' ');
-
-    struct doipPacket::DiagnosticMsg dmsg;
-    doipPkg.DiagnosticMsgAnalyze(dmsg);
-    qDebug() << "DOIP DiagnosticMsgAnalyze "
-             << "type:" << QString::number(dmsg.type)
-             << "sourceAddr:" << QString::number(dmsg.sourceAddr, 16)
-             << "targetAddr:" << QString::number(dmsg.targetAddr, 16)
-             << "uds:" << dmsg.udsData.toHex(' ');
-
     iface_refresh();
 }
 
@@ -328,6 +304,32 @@ bool MainWindow::getValueByDID(quint32 did, QByteArray &value)
     return false;
 }
 
+bool MainWindow::getValueByDTC(quint8 mask, QByteArray &value)
+{
+    // 查询tabview里面的信息
+    quint32 status = 0;
+
+    qDebug() << "mask:" << QString::number(mask, 16);
+    value.clear();
+    for(int i=0; i<ECU_DTC_model->rowCount(); i++)
+    {
+        status = ECU_DTC_model->data(ECU_DTC_model->index(i, 4)).toString().toInt(NULL, 16);   // 状态位
+        if(status & mask)
+        {
+            // 总共四字节， DTC_H DTC_M DTC_L DTCOfStatus, 可以连续多个
+            value.append(ECU_DTC_model->data(ECU_DTC_model->index(i, 1)).toString().toInt(NULL, 16));
+            value.append(ECU_DTC_model->data(ECU_DTC_model->index(i, 2)).toString().toInt(NULL, 16));
+            value.append(ECU_DTC_model->data(ECU_DTC_model->index(i, 3)).toString().toInt(NULL, 16));
+            value.append(ECU_DTC_model->data(ECU_DTC_model->index(i, 4)).toString().toInt(NULL, 16));
+        }
+    }
+
+    if(value.size())
+        return true;
+
+    return false;
+}
+
 bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
 {
     if(!uds.size())
@@ -355,7 +357,7 @@ bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
 
         if(getValueByDID(did, value))
         {
-            resp.append(0x62);
+            resp.append(0x22+0x40);
             resp.append(uds.mid(1, uds.size() > 3 ? 4:2));
             resp.append(value);
         }
@@ -364,6 +366,34 @@ bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
             resp.append(0x7f);
             resp.append(sid);
             resp.append(doipPacket::requestOutOfRange);
+        }
+        break;
+    case 0x19:
+        switch(uds.at(1))
+        {
+            case 0x02:
+            if(getValueByDTC(uds.at(2), value))
+            {
+                resp.append(0x19+0x40);
+                resp.append(uds.mid(1, 2));
+                resp.append(value);
+            }
+            else
+            {
+                resp.append(0x7f);
+                resp.append(sid);
+                resp.append(doipPacket::SubFunctionNotSupported);  // 子功能不支持
+            }
+            break;
+            case 0x01:
+            case 0x03:
+            case 0x04:
+            case 0x0a:
+        default:
+            resp.append(0x7f);
+            resp.append(sid);
+            resp.append(doipPacket::SubFunctionNotSupported);  // 子功能不支持
+            break;
         }
         break;
     default:

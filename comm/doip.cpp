@@ -136,25 +136,6 @@ bool doipPacket::RoutingActivationResponse(quint16 testerLogicalAddr, quint16 so
     return true;
 }
 
-bool doipPacket::isDoipPacket()
-{
-    return false;
-}
-
-bool doipPacket::_getDoipHeader(quint16 &payloadType, quint32 &payloadSize)
-{
-    // DoIP Header
-    // Version ~Versison payloadType payloadSize
-    // 1B      1B        2B          4B
-
-    if(_packet->size() < 8)
-        return false;
-
-    payloadType = _packet->at(2) << 8 | _packet->at(3);
-    payloadSize = _packet->at(4) << 24 | _packet->at(5) << 16 | _packet->at(6) << 8 | _packet->at(7);
-
-    return true;
-}
 
 bool doipPacket::isRoutingActivationRequst()
 {
@@ -195,10 +176,43 @@ bool doipPacket::isRoutingActivationResponse()
     if(payloadType != 0x0006)
         return false;
 
+    return true;
+}
+
+bool doipPacket::RoutingActivationResponseAnalyze(quint16 &testerLogicalAddr, quint16 &sourceAddr, quint8 &respCode)
+{
+    if(!isRoutingActivationResponse())
+        return false;
+
+    // RoutingActivationResponse
+    // testerLogicalAddr sourceAddr respCode ISO OEM
+    //     2B               2B          1B    4B  4B
+    testerLogicalAddr = _packet->at(8) << 8 | _packet->at(9);
+    sourceAddr = _packet->at(10) << 8 | _packet->at(11);
+    respCode = _packet->at(12);
+
+    return true;
+}
+
+bool doipPacket::isDoipPacket()
+{
     return false;
 }
 
+bool doipPacket::_getDoipHeader(quint16 &payloadType, quint32 &payloadSize)
+{
+    // DoIP Header
+    // Version ~Versison payloadType payloadSize
+    // 1B      1B        2B          4B
 
+    if(_packet->size() < 8)
+        return false;
+
+    payloadType = _packet->at(2) << 8 | _packet->at(3);
+    payloadSize = _packet->at(4) << 24 | _packet->at(5) << 16 | _packet->at(6) << 8 | _packet->at(7);
+
+    return true;
+}
 
 bool doipPacket::DiagnosticMsg(quint16 sourceAddr, quint16 targetAddr, QByteArray &udsData)
 {

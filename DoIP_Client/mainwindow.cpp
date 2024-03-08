@@ -21,13 +21,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     // ECU DID
     // 创建一个标准的表格模型
-    ECU_List_model = new QStandardItemModel(0,5);
-    ECU_List_model->setHorizontalHeaderLabels(QStringList() << "IP地址:端口" << "逻辑地址" << "VIN" << "EID" << "GID");
+    ECU_List_model = new QStandardItemModel(0,6);
+    ECU_List_model->setHorizontalHeaderLabels(QStringList() << "VIN" << "逻辑地址"  << "EID" << "GID" << "IP" << "端口");
 
     ui->tableView_ECU_List->setModel(ECU_List_model);
     ui->tableView_ECU_List->resizeColumnsToContents();
+    ui->tableView_ECU_List->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     ui->tableView_ECU_List->show();
 
+    TcpData_Client = new QTcpSocket(this);
+    TcpData_Client->setProxy(QNetworkProxy::NoProxy);   // 去掉QT的系统代理，不然连不上 报错The proxy type is invalid for this operation
     iface_refresh();
 }
 
@@ -83,78 +86,182 @@ void MainWindow::TcpDataDisconnect()
 }
 
 
+bool MainWindow::BytesToDTC(QByteArray &dtc, QString &str)
+{
+    if(dtc.size() != 4)  return false;
+
+    str.resize(5);
+
+    switch(dtc.at(0)>>6 & 0x03)
+    {
+        case 0: str = 'P';   break;
+        case 1: str = 'C';   break;
+        case 2: str = 'B';   break;
+        case 3: str = 'U';   break;
+        default: return false;
+    }
+
+    switch(dtc.at(0)>>4 & 0x03)
+    {
+        case 0: str += '0';   break;
+        case 1: str += '1';   break;
+        case 2: str += '2';   break;
+        case 3: str += '3';   break;
+        default: return false;
+    }
+
+    switch(dtc.at(0) & 0x0F)
+    {
+    case 0: str += '0';   break;
+    case 1: str += '1';   break;
+    case 2: str += '2';   break;
+    case 3: str += '3';   break;
+    case 4: str += '4';   break;
+    case 5: str += '5';   break;
+    case 6: str += '6';   break;
+    case 7: str += '7';   break;
+    case 8: str += '8';   break;
+    default: return false;
+    }
+
+    switch(dtc.at(1)>>4 & 0x0F)
+    {
+    case 0: str += '0';   break;
+    case 1: str += '1';   break;
+    case 2: str += '2';   break;
+    case 3: str += '3';   break;
+    case 4: str += '4';   break;
+    case 5: str += '5';   break;
+    case 6: str += '6';   break;
+    case 7: str += '7';   break;
+    case 8: str += '8';   break;
+    default: return false;
+    }
+
+    switch(dtc.at(1) & 0x0F)
+    {
+    case 0: str += '0';   break;
+    case 1: str += '1';   break;
+    case 2: str += '2';   break;
+    case 3: str += '3';   break;
+    case 4: str += '4';   break;
+    case 5: str += '5';   break;
+    case 6: str += '6';   break;
+    case 7: str += '7';   break;
+    case 8: str += '8';   break;
+    default: return false;
+    }
+
+    qDebug() << "DTC: " << dtc.toHex(' ') << "错误码:" << str;
+
+    return true;
+}
+
+bool MainWindow::udsPrint(QByteArray &uds, QString &inf)
+{
+    if(!uds.size()) return false;
+
+    if(uds.at(0) == 0x7f)
+    {
+        inf = "否等响应\n";
+        inf += "服务: " + QString::number(uds.at(1), 16) + "\n";
+        inf += "数据: " + uds.mid(3, uds.size()).toHex(' ') + "\n";
+        return true;
+    }
+
+    inf = "肯定响应\n";
+    inf += "服务: " + QString::number(uds.at(0)-0x40, 16) + "\n";
+    switch(uds.at(0) - 0x40)
+    {
+    case 0x22:
+        inf += "DID: " + uds.mid(3, 2).toHex(' ') + "\n";
+        inf += "数据: " + uds.mid(5, uds.size()).toHex(' ') + "\n";
+        break;
+    case 0x19:
+        switch(uds.at(1))
+        {
+        case 0x02:
+            inf += "mask: " + QString::number(uds.at(2), 16) + "\n";
+            for(int i=3; i<uds.size(); i+=4)
+            {
+                QString code;
+                QByteArray dtc = uds.mid(i, 4);
+                if(BytesToDTC(dtc, code))
+                {
+                    inf += "DTC: " + code + "\n";
+                }
+                else
+                    inf += "DTC: null \n";
+
+            }
+
+            break;
+        case 0x01:
+        case 0x03:
+        case 0x04:
+        case 0x0A:
+        default:
+            break;
+        }
+    default:
+        break;
+    }
+
+    return true;
+}
+
 void MainWindow::TcpDataReadPendingDatagrams()
 {
-//    //接收数据
-//    QByteArray arr = TcpData_Client->readAll();
-//    qDebug()<<"IP:" <<TcpData_Client_addr.toString() << " Port:" << TcpData_Client_port <<"recv:" << arr.toHex(' ');
+    //接收数据
+    QByteArray arr = TcpData_Client->readAll();
+    qDebug()<<"recv:" << arr.toHex(' ');
 
-//    doipPacket doipMsg(arr);
-//    quint16 testerAddr;
+    doipPacket doipMsg(arr);
+    quint16 targetAddr;
+    quint16 sourceAddr;
+    quint8 rescode;
+    struct doipPacket::DiagnosticMsg diagInfo;
 
-//    if(doipMsg.isRoutingActivationRequst())
-//    {
-//        if(doipMsg.getSourceAddrFromRoutingActivationRequst(testerAddr))
-//        {
-//            doipPacket doipRes;
-//            if(doipRes.RoutingActivationResponse(testerAddr, ui->lineEdit_logicAddr->text().toShort(NULL, 16), 0x10))
-//            {
-//                TcpData_Client->write(doipRes.Data());
+    if(doipMsg.RoutingActivationResponseAnalyze(targetAddr, sourceAddr, rescode))
+    {
+        if(sourceAddr == curVIC->vic.logicalAddr
+            && targetAddr == ui->lineEdit_logicAddr->text().toUShort(NULL, 16))
+        {
+            // 确认是来自请求车辆的DOIP路由激活响应
+            if(rescode == 0x10)
+            {
+                ui->textBrowser->append("车辆连接成功");
+                ui->pushButton->setText("车辆断开");
+                vicIsConnect = true;
+            }
 
-//                qDebug() << "testrAddr:" << QString::number(testerAddr, 16) << "RoutingActivationResponse:" << doipRes.Data().toHex(' ');
-//                ui->textBrowser->append("testrAddr:0x" + QString::number(testerAddr, 16) + " RoutingActivationResponse:" + doipRes.Data().toHex(' '));
-//                ui->label_state->setText("RoutingActivationResponse suncc");
-//            }
-//            else
-//                qDebug() << "creat RoutingActivationResponse pkg filed";
-//        }
-//        else
-//        {
-//            qDebug() << "getSourceAddrFromRoutingActivationRequst failed";
-//            ui->textBrowser->append("getSourceAddrFromRoutingActivationRequst failed");
-//            ui->label_state->setText("RoutingActivationResponse failed");
-//        }
-//    } else if(doipMsg.isDiagnosticMsg())
-//    {
-//        struct doipPacket::DiagnosticMsg dmsg;
-//        if(doipMsg.DiagnosticMsgAnalyze(dmsg))
-//        {
-//            QByteArray resp;
-//            QString result = QString("DOIP DiagnosticMsgAnalyze type: " + QString::number(dmsg.type)
-//                             + " sourceAddr: " + QString::number(dmsg.sourceAddr, 16)
-//                             + " targetAddr: " + QString::number(dmsg.targetAddr, 16)
-//                             + " uds:" + dmsg.udsData.toHex(' '));
-//            qDebug() << result;
-//            ui->textBrowser->append(result);
-
-//            doipPacket doipResACK;
-
-//            // 回应DOIP ACK
-//            if(doipResACK.DiagnosticMsgACK(ui->lineEdit_logicAddr->text().toShort(NULL, 16), dmsg.sourceAddr, 0x00))
-//            {
-//                qDebug() << "DiagnosticMsgACK:" << doipResACK.Data().toHex(' ');
-//                TcpData_Client->write(doipResACK.Data());
-//                TcpData_Client->flush();    //将缓冲区的数据全部发送出去，不然这个的ACK和下面的MSG包会黏在一起发出去
-//            }
-
-//            // 回应 MSG
-//            doipPacket doipRes;
-//            DiagnosticMsgPro(dmsg, resp);
-//            if(doipRes.DiagnosticMsg(ui->lineEdit_logicAddr->text().toShort(NULL, 16), dmsg.sourceAddr,  resp))
-//            {
-//                TcpData_Client->write(doipRes.Data());
-
-//                qDebug() << "testrAddr:" << ui->lineEdit_logicAddr->text() << "DiagnosticMsg:" << doipRes.Data().toHex(' ');
-//                ui->textBrowser->append("testrAddr:0x" + ui->lineEdit_logicAddr->text() + " DiagnosticMsg:" + doipRes.Data().toHex(' '));
-//                ui->label_state->setText("RoutingActivationResponse suncc");
-//            }
-//            else
-//                qDebug() << "creat RoutingActivationResponse pkg filed";
-//        }
-//        else
-//            qDebug() << "DiagnosticMsgAnalyze failed";
-
-//    }
+        }
+        else
+        {
+            qDebug() << "信息不匹配"
+                     << "sourceAddr:" << QString::number(sourceAddr, 16)
+                     << "curVIC->vic.logicalAddr:"<<QString::number(curVIC->vic.logicalAddr, 16)
+                     << "targetAddr" << QString::number(targetAddr, 16)
+                     << "ui->lineEdit_logicAddr->text().toUShort(NULL, 16)" << QString::number(ui->lineEdit_logicAddr->text().toUShort(NULL, 16), 16);
+        }
+    }
+    else if(doipMsg.DiagnosticMsgAnalyze(diagInfo))
+    {
+        if(diagInfo.type == doipPacket::MSG)
+        {
+            qDebug() << "诊断报文:" << diagInfo.udsData.toHex(' ');
+            ui->textBrowser->append("诊断报文:" + diagInfo.udsData.toHex(' '));
+            QString udsInfo;
+            QByteArray uds;
+            uds.append(diagInfo.udsData);
+            udsPrint(uds, udsInfo);
+            qDebug() << udsInfo;
+        }
+    }
+    else
+    {
+        qDebug() << "不是DOIP报文";
+    }
 }
 
 void MainWindow::readPendingDatagrams()
@@ -177,8 +284,6 @@ void MainWindow::readPendingDatagrams()
         struct doipPacket::VehicleAnnouncement vic;
         if(recv.VehicleAnnouncementAnalyze(vic))
         {
-            TcpData_Server_addr = addr;
-            TcpData_Server_port = port;
 
             //显示
             qDebug() << "IP:" << addr.toString() << " Prot:" << QString::number(port) << "DOIP Packet:" << arr.toHex(' ');
@@ -198,15 +303,19 @@ void MainWindow::readPendingDatagrams()
 
             if(0 == vicInfoList.size())
             {
-                qDebug() << "新的车辆信息已记录" << "size:" << QString::number(vicInfoList.size());
                 QList<QStandardItem *> aitemlist;
-                aitemlist.append(new QStandardItem(addr.toString()+":"+QString::number(port)));
-                aitemlist.append(new QStandardItem(QString::asprintf("0x%04X", vic.logicalAddr)));
+
+                // 注意顺序 "VIN" << "逻辑地址"  << "EID" << "GID" << "IP" << "端口"
                 aitemlist.append(new QStandardItem(vic.VIN));
+                aitemlist.append(new QStandardItem(QString::asprintf("0x%04X", vic.logicalAddr)));
                 aitemlist.append(new QStandardItem(QString(vic.EID.toHex())));
                 aitemlist.append(new QStandardItem(QString(vic.GID.toHex())));
+                aitemlist.append(new QStandardItem(addr.toString()));
+                aitemlist.append(new QStandardItem(QString::number(port)));
+
                 ECU_List_model->insertRow(ECU_List_model->rowCount(),aitemlist);
                 vicInfoList.append(vicInfo);
+                qDebug() << "新的车辆信息已记录" << "size:" << QString::number(vicInfoList.size());
             }
             else
             {
@@ -230,7 +339,6 @@ void MainWindow::readPendingDatagrams()
 
                 if(nonexistent)
                 {
-                    qDebug() << "新的车辆信息已记录 " << "size:" << QString::number(vicInfoList.size());
                     QList<QStandardItem *> aitemlist;
                     aitemlist.append(new QStandardItem(addr.toString()+":"+QString::number(port)));
                     aitemlist.append(new QStandardItem(QString::asprintf("0x%04X", vic.logicalAddr)));
@@ -238,7 +346,8 @@ void MainWindow::readPendingDatagrams()
                     aitemlist.append(new QStandardItem(QString(vic.EID.toHex())));
                     aitemlist.append(new QStandardItem(QString(vic.GID.toHex())));
                     ECU_List_model->insertRow(ECU_List_model->rowCount(),aitemlist);
-                    vicInfoList.append(vicInfo);
+
+                    qDebug() << "新的车辆信息已记录 " << "size:" << QString::number(vicInfoList.size());
                 }
 
             }
@@ -274,7 +383,12 @@ void MainWindow::on_pushButton_start_clicked()
     {
         Discover_Socket = new QUdpSocket();
 
-        if(false == Discover_Socket->bind(QHostAddress(ui->comboBox_iface->currentText()), ui->lineEdit_UDP_DISCOVER->text().toInt(NULL)))   // 绑定网卡所在的IP
+        bool ret = false;
+        if(ui->lineEdit_UDP_DISCOVER->text().toInt(NULL))
+            ret = Discover_Socket->bind(QHostAddress(ui->comboBox_iface->currentText()), ui->lineEdit_UDP_DISCOVER->text().toInt(NULL));
+        else
+            ret = Discover_Socket->bind(QHostAddress(ui->comboBox_iface->currentText()));
+        if(false == ret)   // 绑定网卡所在的IP
         {
             ui->label_state->setText("Discover IP地址绑定失败，检查IP地址是否可用！");
             return;
@@ -300,4 +414,134 @@ void MainWindow::on_pushButton_start_clicked()
 
 }
 
+void MainWindow::on_pushButton_vic_connect_clicked()
+{
+    // 根据选中的车辆，发送路由激活请求(DOIP)
+    if(vicIsConnect)
+    {
+        TcpData_Client->disconnect();
+        ui->textBrowser->append("车辆已断开");
+        ui->pushButton->setText("车辆连接");
+        ui->pushButton_vic_connect->setText("连接车辆");
+        ui->pushButton->setEnabled(true);
+        vicIsConnect = false;
+    }
+    else
+    {
+        // 注意顺序 "VIN" << "逻辑地址"  << "EID" << "GID" << "IP" << "端口"
+        QModelIndex curIndex = ui->tableView_ECU_List->currentIndex();
+        QString vic_IP = ECU_List_model->data(ECU_List_model->index(curIndex.row(), 4)).toString();
+        quint16 port = ECU_List_model->data(ECU_List_model->index(curIndex.row(), 5)).toString().toUShort();
+        quint16 vic_logicAddr = ECU_List_model->data(ECU_List_model->index(curIndex.row(), 1)).toString().toUShort();
+
+        QString vic_logicAddr1 = ECU_List_model->data(ECU_List_model->index(curIndex.row(), 1)).toString();
+        qDebug() << "vic_logicAddr1:" << vic_logicAddr1;
+
+        vic_logicAddr = vic_logicAddr1.toUShort(NULL, 16);
+
+        qDebug() << "ECU_List_model->data(ECU_List_model->index(curIndex.row(), 1)):" << ECU_List_model->data(ECU_List_model->index(curIndex.row(), 1));
+        qDebug() << "ECU_List_model->data(ECU_List_model->index(curIndex.row(), 1)).toString():" << ECU_List_model->data(ECU_List_model->index(curIndex.row(), 1)).toString();
+        qDebug() << "ECU_List_model->data(ECU_List_model->index(curIndex.row(), 1)).toUShort():" << QString::number(ECU_List_model->data(ECU_List_model->index(curIndex.row(), 1)).toString().toUShort(), 16);
+
+        qDebug() << "vic_logicAddr1.toUShort():" << QString::number(vic_logicAddr1.toUShort(), 16);
+        qDebug() << "IP:" << vic_IP << "Port:" << QString::number(port, 10) << "vic_logicAddr:" << QString::number(vic_logicAddr, 16);
+
+        for(int i=0; i<vicInfoList.size(); i++)
+        {
+            VehicleInfo *node = (VehicleInfo *)&vicInfoList.at(i);
+            if(node->addr == QHostAddress(vic_IP)
+                && node->port == port
+                && node->vic.logicalAddr == vic_logicAddr)
+            {
+                curVIC = node;
+                break;
+            }
+        }
+
+        if(curVIC == NULL)
+        {
+            qDebug() << "车辆信息未保存";
+            return;
+        }
+
+
+        TcpData_Client->connectToHost(curVIC->addr, curVIC->port);
+
+        if(true == TcpData_Client->waitForConnected(3000))
+        {
+            connect(TcpData_Client, &QTcpSocket::readyRead, this, &MainWindow::TcpDataReadPendingDatagrams);
+            doipPacket doipMsg;
+            doipMsg.RoutingActivationRequst(ui->lineEdit_logicAddr->text().toShort(NULL, 16), 0);
+            TcpData_Client->write(doipMsg.Data());
+            TcpData_Client->flush();
+            ui->textBrowser->append("TCP连接成功");
+            ui->pushButton_vic_connect->setText("断开车辆");
+            ui->pushButton->setEnabled(false);
+        }
+        else
+        {
+            ui->textBrowser->append("车辆连接失败" + curVIC->addr.toString() + ":" + QString::number(curVIC->port, 10));
+        }
+
+
+    }
+}
+
+
+void MainWindow::on_pushButton_readDID_clicked()
+{
+    doipPacket doipMsg;
+    QByteArray uds;
+    quint16 DID = 0;
+
+    if(!vicIsConnect)
+    {
+        qDebug() << "车辆未连接！";
+        return;
+    }
+
+    DID = ui->lineEdit_DID->text().toUShort(NULL, 16);
+    qDebug() << "DID:" << QString::number(DID, 16);
+    uds.append(0x22);
+    uds.append(DID>>8 & 0xff);
+    uds.append(DID>>0 & 0xff);
+
+    doipMsg.DiagnosticMsg(ui->lineEdit_logicAddr->text().toShort(NULL, 16), curVIC->vic.logicalAddr, uds);
+
+    qDebug() << "msg:" << doipMsg.Data().toHex(' ');
+    TcpData_Client->write(doipMsg.Data());
+    TcpData_Client->flush();
+}
+
+
+void MainWindow::on_pushButton_readDID_2_clicked()
+{
+
+}
+
+
+void MainWindow::on_pushButton_readDTC_clicked()
+{
+    doipPacket doipMsg;
+    QByteArray uds;
+    quint16 DTC_mask = 0;
+
+    if(!vicIsConnect)
+    {
+        qDebug() << "车辆未连接！";
+        return;
+    }
+
+    DTC_mask = ui->lineEdit_DTC->text().toUShort(NULL, 16);
+    qDebug() << "DTC mask:" << QString::number(DTC_mask, 16);
+    uds.append(0x19);
+    uds.append(0x02);
+    uds.append(DTC_mask);
+
+    doipMsg.DiagnosticMsg(ui->lineEdit_logicAddr->text().toShort(NULL, 16), curVIC->vic.logicalAddr, uds);
+
+    qDebug() << "msg:" << doipMsg.Data().toHex(' ');
+    TcpData_Client->write(doipMsg.Data());
+    TcpData_Client->flush();
+}
 
