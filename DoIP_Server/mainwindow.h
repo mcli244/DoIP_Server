@@ -35,11 +35,7 @@ private slots:
     void iface_refresh();
     bool sendVehicleAnnouncement(QHostAddress addr, quint16 port);
 
-    void on_pushButton_add_col_clicked();
-
     void on_pushButton_add_row_clicked();
-
-    void on_pushButton_del_col_clicked();
 
     void on_pushButton_del_row_clicked();
 

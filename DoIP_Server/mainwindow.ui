@@ -304,23 +304,9 @@
             <item>
              <layout class="QVBoxLayout" name="verticalLayout_6">
               <item>
-               <widget class="QPushButton" name="pushButton_add_col">
-                <property name="text">
-                 <string>添加列</string>
-                </property>
-               </widget>
-              </item>
-              <item>
                <widget class="QPushButton" name="pushButton_add_row">
                 <property name="text">
                  <string>添加行</string>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QPushButton" name="pushButton_del_col">
-                <property name="text">
-                 <string>删除列</string>
                 </property>
                </widget>
               </item>

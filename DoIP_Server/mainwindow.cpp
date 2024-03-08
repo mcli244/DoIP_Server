@@ -75,6 +75,7 @@ MainWindow::MainWindow(QWidget *parent)
     initDTC();
 
     iface_refresh();
+
 }
 
 MainWindow::~MainWindow()
@@ -96,6 +97,7 @@ void MainWindow::initDID(void)
 
     ui->tableView_ECU_DID->setModel(ECU_DID_model);
     ui->tableView_ECU_DID->resizeColumnsToContents();
+    ui->tableView_ECU_DID->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     ui->tableView_ECU_DID->show();
 }
 
@@ -177,23 +179,24 @@ void MainWindow::initDTC(void)
 
     ECU_DTC_model = new QStandardItemModel(0,6);
     ECU_DTC_model->setHorizontalHeaderLabels(QStringList()
-                                             << "五位标准故障码"
-                                             << "DTCHighByte(Hex)"
-                                             << "DTCMiddleByte(Hex)"
-                                             << "DTCLowByte(Hex)"
-                                             << "StatusOfDTC(Hex)"
+                                             << "故障码"
+                                             << "DTCH"
+                                             << "DTCM"
+                                             << "DTCL"
+                                             << "DTCS"
                                              << "描述");
     ECU_DTC_model->setItem(0, 0, new QStandardItem(code));
     ECU_DTC_model->setItem(0, 1, new QStandardItem(QString::asprintf("0x%02X", DTCHighByte)));
     ECU_DTC_model->setItem(0, 2, new QStandardItem(QString::asprintf("0x%02X", DTCMiddleByte)));
     ECU_DTC_model->setItem(0, 3, new QStandardItem("0x00"));
-    ECU_DTC_model->setItem(0, 4, new QStandardItem("0x00"));
+    ECU_DTC_model->setItem(0, 4, new QStandardItem("0x09"));
     ECU_DTC_model->setItem(0, 5, new QStandardItem("发动机温度过低"));
 
     //设置某列只读
     ReadOnlyDelegate* readOnlyDelegate = new ReadOnlyDelegate();
     ui->tableView_ECU_DTC->setItemDelegateForColumn(1, readOnlyDelegate);
     ui->tableView_ECU_DTC->setItemDelegateForColumn(2, readOnlyDelegate);
+    ui->tableView_ECU_DTC->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
     // 只允许输入以PCBU字符开头，后面跟4个数字的数据
     UserIDDelegate* UserID = new UserIDDelegate();
@@ -644,13 +647,6 @@ void MainWindow::on_pushButton_start_clicked()
 
 }
 
-
-void MainWindow::on_pushButton_add_col_clicked()
-{
-
-}
-
-
 void MainWindow::on_pushButton_add_row_clicked()
 {
 
@@ -667,13 +663,6 @@ void MainWindow::on_pushButton_add_row_clicked()
     aitemlist<<item;
     ECU_DID_model->insertRow(ECU_DID_model->rowCount(),aitemlist);
 }
-
-
-void MainWindow::on_pushButton_del_col_clicked()
-{
-
-}
-
 
 void MainWindow::on_pushButton_del_row_clicked()
 {
