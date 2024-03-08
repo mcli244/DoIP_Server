@@ -513,13 +513,6 @@ void MainWindow::on_pushButton_readDID_clicked()
     TcpData_Client->flush();
 }
 
-
-void MainWindow::on_pushButton_readDID_2_clicked()
-{
-
-}
-
-
 void MainWindow::on_pushButton_readDTC_clicked()
 {
     doipPacket doipMsg;

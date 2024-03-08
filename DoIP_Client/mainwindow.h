@@ -43,11 +43,7 @@ private slots:
 
     void on_pushButton_vic_connect_clicked();
 
-    void on_pushButton_4_clicked();
-
     void on_pushButton_readDID_clicked();
-
-    void on_pushButton_readDID_2_clicked();
 
     void on_pushButton_readDTC_clicked();
 
