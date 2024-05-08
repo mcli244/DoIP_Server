@@ -8,19 +8,59 @@
 #include <QThread>
 #include <cstring>
 
+bool udsMsgTest()
+{
+    QByteArray arr;
+    arr.resize(16);
+
+    arr[0] = 0x59;
+    arr[1] = 0x02;
+    arr[2] = 0xff;
+    arr[3] = 0x01;
+    arr[4] = 0x28;
+    arr[5] = 0x00;
+    arr[6] = 0x09;
+    arr[7] = 0x01;
+    arr[8] = 0x29;
+    arr[9] = 0x00;
+    arr[10] = 0x08;
+    arr[11] = 0x01;
+    arr[12] = 0x30;
+    arr[13] = 0x00;
+    arr[14] = 0x08;
+    udsMsg udsPacket(arr);
+
+    struct udsMsg::udsDtc dtcInf;
+    udsPacket.DTCAnalyze(dtcInf);
+    qDebug() << QString::asprintf("dtcSize:%d SID:0x%x SubID:0x%x mask:0x%x",
+                                  dtcInf.dtcList.size(),
+                                  dtcInf.SID,
+                                  dtcInf.SubID,
+                                  dtcInf.mask);
+    for(int i=0; i<dtcInf.dtcList.size(); i++)
+    {
+        qDebug() << QString::asprintf("%d/%d %s",
+                                      i,
+                                      dtcInf.dtcList.size(),
+                                      dtcInf.dtcList.at(i).eCodeStr.toUtf8().constData());
+    }
+    return true;
+}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+
+    udsMsgTest();
+
     ui->label_state->setText("DoIP Client is stop");
 
     // 禁用 车辆声明广播按钮
     ui->pushButton->setEnabled(false);
 
-    // ECU DID
-    // 创建一个标准的表格模型
+    // 车辆列表
     ECU_List_model = new QStandardItemModel(0,6);
     ECU_List_model->setHorizontalHeaderLabels(QStringList() << "VIN" << "逻辑地址"  << "EID" << "GID" << "IP" << "端口");
 
@@ -28,6 +68,15 @@ MainWindow::MainWindow(QWidget *parent)
     ui->tableView_ECU_List->resizeColumnsToContents();
     ui->tableView_ECU_List->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     ui->tableView_ECU_List->show();
+
+    // 错误码 DTC
+    ECU_List_model_dtc = new QStandardItemModel(0,3);
+    ECU_List_model_dtc->setHorizontalHeaderLabels(QStringList() << "故障代码" << "描述"  << "状态");
+    ui->tableView_DTC_List->setModel(ECU_List_model_dtc);
+    ui->tableView_DTC_List->resizeColumnsToContents();
+    ui->tableView_DTC_List->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui->tableView_DTC_List->setAlternatingRowColors(true); // 行背景交替改变
+    ui->tableView_DTC_List->show();
 
     TcpData_Client = new QTcpSocket(this);
     TcpData_Client->setProxy(QNetworkProxy::NoProxy);   // 去掉QT的系统代理，不然连不上 报错The proxy type is invalid for this operation
@@ -85,124 +134,48 @@ void MainWindow::TcpDataDisconnect()
 //    TcpData_Client_port = 0;
 }
 
-
-bool MainWindow::BytesToDTC(QByteArray &dtc, QString &str)
+bool MainWindow::udsPro(QByteArray &uds)
 {
-    if(dtc.size() != 4)  return false;
+    qint32 i = 0;
+    udsMsg udsPacket(uds);
+    struct udsMsg::udsResponse udsResp;
+    struct udsMsg::udsDtc udsDtc;
 
-    str.resize(5);
-
-    switch(dtc.at(0)>>6 & 0x03)
-    {
-        case 0: str = 'P';   break;
-        case 1: str = 'C';   break;
-        case 2: str = 'B';   break;
-        case 3: str = 'U';   break;
-        default: return false;
-    }
-
-    switch(dtc.at(0)>>4 & 0x03)
-    {
-        case 0: str += '0';   break;
-        case 1: str += '1';   break;
-        case 2: str += '2';   break;
-        case 3: str += '3';   break;
-        default: return false;
-    }
-
-    switch(dtc.at(0) & 0x0F)
-    {
-    case 0: str += '0';   break;
-    case 1: str += '1';   break;
-    case 2: str += '2';   break;
-    case 3: str += '3';   break;
-    case 4: str += '4';   break;
-    case 5: str += '5';   break;
-    case 6: str += '6';   break;
-    case 7: str += '7';   break;
-    case 8: str += '8';   break;
-    default: return false;
-    }
-
-    switch(dtc.at(1)>>4 & 0x0F)
-    {
-    case 0: str += '0';   break;
-    case 1: str += '1';   break;
-    case 2: str += '2';   break;
-    case 3: str += '3';   break;
-    case 4: str += '4';   break;
-    case 5: str += '5';   break;
-    case 6: str += '6';   break;
-    case 7: str += '7';   break;
-    case 8: str += '8';   break;
-    default: return false;
-    }
-
-    switch(dtc.at(1) & 0x0F)
-    {
-    case 0: str += '0';   break;
-    case 1: str += '1';   break;
-    case 2: str += '2';   break;
-    case 3: str += '3';   break;
-    case 4: str += '4';   break;
-    case 5: str += '5';   break;
-    case 6: str += '6';   break;
-    case 7: str += '7';   break;
-    case 8: str += '8';   break;
-    default: return false;
-    }
-
-    qDebug() << "DTC: " << dtc.toHex(' ') << "错误码:" << str;
-
-    return true;
-}
-
-bool MainWindow::udsPrint(QByteArray &uds, QString &inf)
-{
     if(!uds.size()) return false;
 
-    if(uds.at(0) == 0x7f)
+    udsPacket.isUdsResponse(udsResp);
+    if(!udsResp.isPositiveResponse)
     {
-        inf = "否等响应\n";
-        inf += "服务: " + QString::number(uds.at(1), 16) + "\n";
-        inf += "数据: " + uds.mid(3, uds.size()).toHex(' ') + "\n";
+        qDebug() << QString::asprintf("否定应答 SID:0x%x NRC:%d\n",
+                                      udsResp.SID,
+                                      udsResp.NRC);
         return true;
     }
 
-    inf = "肯定响应\n";
-    inf += "服务: " + QString::number(uds.at(0)-0x40, 16) + "\n";
-    switch(uds.at(0) - 0x40)
+    qDebug() << QString::asprintf("肯定应答 SID:0x%x\n",
+                                  udsResp.SID);
+    switch(udsResp.SID)
     {
     case 0x22:
-        inf += "DID: " + uds.mid(3, 2).toHex(' ') + "\n";
-        inf += "数据: " + uds.mid(5, uds.size()).toHex(' ') + "\n";
+        qDebug() << "DID: " + uds.mid(3, 2).toHex(' ') + "\n";
+        qDebug() << "数据: " + uds.mid(5, uds.size()).toHex(' ') + "\n";
         break;
     case 0x19:
-        switch(uds.at(1))
+        if(!udsPacket.DTCAnalyze(udsDtc))
         {
-        case 0x02:
-            inf += "mask: " + QString::number(uds.at(2), 16) + "\n";
-            for(int i=3; i<uds.size(); i+=4)
-            {
-                QString code;
-                QByteArray dtc = uds.mid(i, 4);
-                if(BytesToDTC(dtc, code))
-                {
-                    inf += "DTC: " + code + "\n";
-                }
-                else
-                    inf += "DTC: null \n";
-
-            }
-
-            break;
-        case 0x01:
-        case 0x03:
-        case 0x04:
-        case 0x0A:
-        default:
+            qDebug() << "DTCAnalyze failed";
             break;
         }
+
+        for(i=0; i<udsDtc.dtcList.size(); i++)
+        {
+            QList<QStandardItem *> aitemlist;
+            aitemlist.append(new QStandardItem(udsDtc.dtcList.at(i).eCodeStr));
+            aitemlist.append(new QStandardItem(udsDtc.dtcList.at(i).description));
+            aitemlist.append(new QStandardItem(udsDtc.dtcList.at(i).state));
+            ECU_List_model_dtc->insertRow(ECU_List_model_dtc->rowCount(),aitemlist);
+        }
+        break;
     default:
         break;
     }
@@ -254,8 +227,7 @@ void MainWindow::TcpDataReadPendingDatagrams()
             QString udsInfo;
             QByteArray uds;
             uds.append(diagInfo.udsData);
-            udsPrint(uds, udsInfo);
-            qDebug() << udsInfo;
+            udsPro(uds);
         }
     }
     else
@@ -487,24 +459,14 @@ void MainWindow::on_pushButton_vic_connect_clicked()
     }
 }
 
-
-void MainWindow::on_pushButton_readDID_clicked()
+void MainWindow::sendUdsComm(QByteArray &uds)
 {
     doipPacket doipMsg;
-    QByteArray uds;
-    quint16 DID = 0;
-
     if(!vicIsConnect)
     {
         qDebug() << "车辆未连接！";
         return;
     }
-
-    DID = ui->lineEdit_DID->text().toUShort(NULL, 16);
-    qDebug() << "DID:" << QString::number(DID, 16);
-    uds.append(0x22);
-    uds.append(DID>>8 & 0xff);
-    uds.append(DID>>0 & 0xff);
 
     doipMsg.DiagnosticMsg(ui->lineEdit_logicAddr->text().toShort(NULL, 16), curVIC->vic.logicalAddr, uds);
 
@@ -513,17 +475,24 @@ void MainWindow::on_pushButton_readDID_clicked()
     TcpData_Client->flush();
 }
 
+void MainWindow::on_pushButton_readDID_clicked()
+{
+    quint16 DID = 0;
+    QByteArray uds;
+
+    DID = ui->lineEdit_DID->text().toUShort(NULL, 16);
+    qDebug() << "DID:" << QString::number(DID, 16);
+    uds.append(0x22);
+    uds.append(DID>>8 & 0xff);
+    uds.append(DID>>0 & 0xff);
+
+    sendUdsComm(uds);
+}
+
 void MainWindow::on_pushButton_readDTC_clicked()
 {
-    doipPacket doipMsg;
     QByteArray uds;
     quint16 DTC_mask = 0;
-
-    if(!vicIsConnect)
-    {
-        qDebug() << "车辆未连接！";
-        return;
-    }
 
     DTC_mask = ui->lineEdit_DTC->text().toUShort(NULL, 16);
     qDebug() << "DTC mask:" << QString::number(DTC_mask, 16);
@@ -531,10 +500,31 @@ void MainWindow::on_pushButton_readDTC_clicked()
     uds.append(0x02);
     uds.append(DTC_mask);
 
-    doipMsg.DiagnosticMsg(ui->lineEdit_logicAddr->text().toShort(NULL, 16), curVIC->vic.logicalAddr, uds);
+    sendUdsComm(uds);
+}
 
-    qDebug() << "msg:" << doipMsg.Data().toHex(' ');
-    TcpData_Client->write(doipMsg.Data());
-    TcpData_Client->flush();
+
+void MainWindow::on_pushButton_readAllDTC_clicked()
+{
+    QByteArray uds;
+
+    uds.append(0x19);
+    uds.append(0x0A);
+
+    sendUdsComm(uds);
+}
+
+
+void MainWindow::on_pushButton_cleanDTC_clicked()
+{
+    QByteArray uds;
+
+    // 14 + groupOfDTC 3Bytes
+    uds.append(0x14);
+    uds.append(0xFF);
+    uds.append(0xFF);
+    uds.append(0xFF);
+
+    sendUdsComm(uds);
 }
 

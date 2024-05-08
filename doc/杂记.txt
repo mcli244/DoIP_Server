@@ -47,7 +47,7 @@ DTC:Diagnostic Trouble Code，诊断故障码，即 故障类型的 ID。
 	<-- 62 f1 90 31 32 33 34 35 36 37 38 39 30 31 32 33 34 35 36 37 // 肯定响应
 	<-- 62 f1 91 31 32 33 34 74 65 73 74 // 肯定响应
 
-// 18 服务，读取DTC 故障码
+// 19 服务，读取DTC 故障码
 	19 02 ReadDTC Status
 	19 04 ReadSnapshotData with DTC
 	19 06 ReadExtendData with DTC

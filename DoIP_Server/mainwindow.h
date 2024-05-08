@@ -65,7 +65,7 @@ private:
     void initDID(void);
     bool DTCToBytes(QString dtc, quint8 &DTCHighByte, quint8 &DTCMiddleByte);
     void DTCInfoRefresh(void);
-    bool getValueByDTC(quint8 mask, QByteArray &value);
-
+    bool getValueByDTC(QByteArray &value, quint8 mask);
+    bool clearDTC(quint32 mask);
 };
 #endif // MAINWINDOW_H

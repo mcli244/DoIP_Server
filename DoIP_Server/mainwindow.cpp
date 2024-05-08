@@ -307,7 +307,7 @@ bool MainWindow::getValueByDID(quint32 did, QByteArray &value)
     return false;
 }
 
-bool MainWindow::getValueByDTC(quint8 mask, QByteArray &value)
+bool MainWindow::getValueByDTC(QByteArray &value, quint8 mask)
 {
     // 查询tabview里面的信息
     quint32 status = 0;
@@ -333,6 +333,18 @@ bool MainWindow::getValueByDTC(quint8 mask, QByteArray &value)
     return false;
 }
 
+bool MainWindow::clearDTC(quint32 mask)
+{
+    // TODO 根据mask去删除DTC
+    qDebug() << "mask:" << QString::number(mask, 16);
+
+    while (ECU_DTC_model->rowCount() > 0) {
+        ECU_DTC_model->removeRow(0);
+    }
+
+    return false;
+}
+
 bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
 {
     if(!uds.size())
@@ -340,6 +352,7 @@ bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
 
     quint8 sid = uds.at(0);
     quint32 did;
+    quint8 mask = 0;
     QByteArray value;
 
     switch (sid) {
@@ -375,29 +388,46 @@ bool MainWindow::DiagnosticMsgPro(QByteArray &uds, QByteArray &resp)
         switch(uds.at(1))
         {
             case 0x02:
-            if(getValueByDTC(uds.at(2), value))
-            {
-                resp.append(0x19+0x40);
-                resp.append(uds.mid(1, 2));
-                resp.append(value);
-            }
-            else
-            {
-                resp.append(0x7f);
-                resp.append(sid);
-                resp.append(doipPacket::SubFunctionNotSupported);  // 子功能不支持
-            }
-            break;
-            case 0x01:
-            case 0x03:
-            case 0x04:
+                if(getValueByDTC(value, uds.at(2)))
+                {
+                    resp.append(0x19+0x40);
+                    resp.append(uds.mid(1, 2));
+                    resp.append(value);
+                }
+                else
+                {
+                    resp.append(0x7f);
+                    resp.append(sid);
+                    resp.append(doipPacket::SubFunctionNotSupported);  // 子功能不支持
+                }
+                break;
+            case 0x01: break;
+            case 0x03: break;
+            case 0x04: break;
             case 0x0a:
+                if(getValueByDTC(value, 0xff))
+                {
+                    resp.append(0x19+0x40);
+                    resp.append(uds.at(1));
+                    resp.append(value);
+                }
+                else
+                {
+                    resp.append(0x7f);
+                    resp.append(sid);
+                    resp.append(doipPacket::SubFunctionNotSupported);  // 子功能不支持
+                }
+                break;
+            break;
         default:
             resp.append(0x7f);
             resp.append(sid);
             resp.append(doipPacket::SubFunctionNotSupported);  // 子功能不支持
             break;
         }
+        break;
+    case 0x14:
+        clearDTC(0xFFFFFF);
         break;
     default:
         resp.append(0x7f);

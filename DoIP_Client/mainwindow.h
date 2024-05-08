@@ -9,6 +9,7 @@
 #include <QString>
 #include <QNetworkProxy>
 #include "../comm/doip.h"
+#include "../comm/uds.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -47,6 +48,10 @@ private slots:
 
     void on_pushButton_readDTC_clicked();
 
+    void on_pushButton_readAllDTC_clicked();
+
+    void on_pushButton_cleanDTC_clicked();
+
 private:
     Ui::MainWindow *ui;
     QUdpSocket *Discover_Socket = NULL;
@@ -55,9 +60,11 @@ private:
     bool runing = false;
 
     QStandardItemModel *ECU_List_model;
+    QStandardItemModel *ECU_List_model_dtc;
     QList<VehicleInfo> vicInfoList;
     bool vicIsConnect = false;
     bool BytesToDTC(QByteArray &dtc, QString &str);
-    bool udsPrint(QByteArray &uds, QString &inf);
+    bool udsPro(QByteArray &uds);
+    void sendUdsComm(QByteArray &uds);
 };
 #endif // MAINWINDOW_H
